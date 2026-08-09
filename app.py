@@ -1,5 +1,6 @@
 import os
 import tempfile
+import urllib.request
 import numpy as np
 import soundfile as sf
 import streamlit as st
@@ -138,19 +139,30 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Paired-Asset Loader
+# 3. Resilient Asset Loader
 @st.cache_resource(show_spinner=False)
 def load_onnx_kokoro():
+    cache_dir = tempfile.gettempdir()
+    model_path = os.path.join(cache_dir, "kokoro-v0_19.onnx")
+    voices_path = os.path.join(cache_dir, "voices.json")
+
+    # Primary: Hugging Face onnx-community repository
     try:
-        model_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/model.onnx")
-        voices_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="voices.bin")
-        return Kokoro(model_path, voices_path)
+        m_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/model.onnx")
+        v_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="voices.bin")
+        return Kokoro(m_path, v_path)
     except Exception:
         pass
 
+    # Secondary: Direct Asset Fetch
+    onnx_url = "https://github.com/remsaim/kokoro-onnx/releases/download/v0.19/kokoro-v0_19.onnx"
+    voices_url = "https://github.com/remsaim/kokoro-onnx/releases/download/v0.19/voices.json"
+
     try:
-        model_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="kokoro-v0_19.onnx")
-        voices_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="voices.json")
+        if not os.path.exists(model_path):
+            urllib.request.urlretrieve(onnx_url, model_path)
+        if not os.path.exists(voices_path):
+            urllib.request.urlretrieve(voices_url, voices_path)
         return Kokoro(model_path, voices_path)
     except Exception as e:
         raise RuntimeError(f"Failed to fetch Kokoro ONNX model and voices: {e}")
