@@ -110,10 +110,28 @@ VOICE_MAP = {
     "🇬🇧 Lencho (British Male - Narration)": "bm_fable"
 }
 
-# 4. Sidebar Controls
+# 4. Sidebar Controls & Preview Feature
 with st.sidebar:
     st.title("⚙️ Studio Settings")
     voice_display_name = st.selectbox("🎙️ Voice Persona", options=list(VOICE_MAP.keys()), index=10)
+
+    if st.button("▶️ Preview Voice"):
+        voice_key = VOICE_MAP.get(voice_display_name, 'bm_fable')
+        preview_text = "Hello! This is a quick preview of this voice persona."
+        with st.spinner("Generating preview..."):
+            try:
+                kokoro_engine = get_kokoro_engine()
+                samples, sample_rate = kokoro_engine.create(
+                    preview_text, voice=voice_key, speed=1.0, lang="en-us"
+                )
+                if samples is not None and len(samples) > 0:
+                    temp_preview = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+                    sf.write(temp_preview.name, samples, sample_rate)
+                    st.audio(temp_preview.name, format="audio/wav")
+            except Exception:
+                st.error("Could not generate preview.")
+
+    st.markdown("<br>", unsafe_allow_html=True)
     speed = st.slider("⚡ Speed Rate", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
     st.divider()
     st.caption("🚀 **Engine:** Streamlit RAM Optimized.")
