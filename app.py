@@ -1,7 +1,6 @@
 import tempfile
 import gc
 import os
-import re
 import numpy as np
 import soundfile as sf
 import streamlit as st
@@ -16,8 +15,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ⚡ PERFORMANCE OPTIMIZATION:
-# Allow multi-threading on CPU for faster PyTorch execution
+# ⚡ CPU Performance Optimization
 num_cores = max(1, min(4, os.cpu_count() or 2))
 torch.set_num_threads(num_cores)
 
@@ -192,7 +190,7 @@ with st.sidebar:
 st.markdown("""
 <div class="hero-container">
     <div class="hero-title">🎧 <span class="lencho-highlight">LENCHOS</span> VOICE LAB</div>
-    <div class="hero-subtitle">Studio-Grade Text-to-Speech Engine Created by Lencho Lemessa</div>
+    <div class="hero-subtitle">Studio-Grade Text-to-Speech Engine Created By <b>Lencho</b> Lemessa</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -229,50 +227,49 @@ if generate_btn:
     else:
         st.markdown("<h3 style='color: white;'>🔊 Studio Render Output</h3>", unsafe_allow_html=True)
         with st.container(border=True):
-            pipeline = load_pipeline()
-            actual_voice = VOICE_MAP.get(voice_display_name, 'bm_fable')
-            
-            # Split sentences for fast batch inference
-            sentences = [s.strip() for s in re.split(r'[\n.]+', text_input) if s.strip()]
-            total_sentences = max(1, len(sentences))
-            
-            progress_bar = st.progress(0.0, text="Synthesizing audio...")
-            audio_chunks = []
-            
-            with torch.no_grad():
-                for i, sentence in enumerate(sentences):
-                    generator = pipeline(sentence, voice=actual_voice, speed=speed)
-                    for _, _, audio in generator:
+            try:
+                progress_bar = st.progress(0.0, text="Initializing TTS Pipeline...")
+                pipeline = load_pipeline()
+                actual_voice = VOICE_MAP.get(voice_display_name, 'bm_fable')
+                
+                audio_chunks = []
+                progress_bar.progress(0.2, text="Synthesizing speech...")
+                
+                with torch.no_grad():
+                    generator = pipeline(text_input, voice=actual_voice, speed=speed)
+                    for idx, (_, _, audio) in enumerate(generator):
                         audio_chunks.append(audio)
+                        pct = min(0.90, 0.2 + (idx + 1) * 0.1)
+                        progress_bar.progress(pct, text=f"Rendering audio segment {idx + 1}...")
+
+                if audio_chunks:
+                    progress_bar.progress(0.95, text="Saving WAV file...")
+                    full_audio = np.concatenate(audio_chunks)
                     
-                    pct = min(0.95, (i + 1) / total_sentences)
-                    progress_bar.progress(pct, text=f"Processing segment {i+1}/{total_sentences}...")
+                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+                    sf.write(temp_file.name, full_audio, 24000)
+                    
+                    progress_bar.progress(1.0, text="Complete!")
+                    
+                    # Cleanup
+                    del audio_chunks, full_audio
+                    gc.collect()
 
-            if audio_chunks:
-                progress_bar.progress(0.98, text="Merging audio channels...")
-                full_audio = np.concatenate(audio_chunks)
-                
-                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-                sf.write(temp_file.name, full_audio, 24000)
-                
-                progress_bar.progress(1.0, text="Complete!")
-                
-                # Cleanup
-                del audio_chunks, full_audio
-                gc.collect()
+                    col_audio, col_dl = st.columns([3, 1])
+                    with col_audio:
+                        st.audio(temp_file.name, format="audio/wav")
+                    with col_dl:
+                        with open(temp_file.name, "rb") as file:
+                            st.download_button(
+                                label="📥 Download WAV",
+                                data=file,
+                                file_name="lencho_voice.wav",
+                                mime="audio/wav",
+                                use_container_width=True
+                            )
+                else:
+                    progress_bar.empty()
+                    st.error("No audio was generated. Please check your text input.")
 
-                col_audio, col_dl = st.columns([3, 1])
-                with col_audio:
-                    st.audio(temp_file.name, format="audio/wav")
-                with col_dl:
-                    with open(temp_file.name, "rb") as file:
-                        st.download_button(
-                            label="📥 Download WAV",
-                            data=file,
-                            file_name="lencho_voice.wav",
-                            mime="audio/wav",
-                            use_container_width=True
-                        )
-            else:
-                progress_bar.empty()
-                st.error("Speech generation failed.")
+            except Exception as err:
+                st.error(f"An error occurred during generation: {str(err)}")
