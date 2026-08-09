@@ -1,6 +1,5 @@
 import os
 import tempfile
-import urllib.request
 import numpy as np
 import soundfile as sf
 import streamlit as st
@@ -139,40 +138,20 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Bulletproof HuggingFace Asset Loader
+# 3. Clean Native Hugging Face Hub Loader
 @st.cache_resource(show_spinner=False)
 def load_onnx_kokoro():
-    # Load ONNX model weights
+    # Retrieve ONNX weights directly via hf_hub_download
     try:
-        model_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/model.onnx")
-    except Exception:
         model_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="kokoro-v0_19.onnx")
+    except Exception:
+        model_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/model.onnx")
 
-    # Load voices embeddings file (voices.bin is natively supported by kokoro-onnx)
-    voices_path = None
-    voice_sources = [
-        ("hexgrad/Kokoro-82M", "voices.bin"),
-        ("hexgrad/Kokoro-82M", "voices.json"),
-        ("onnx-community/Kokoro-82M-ONNX", "voices.bin"),
-    ]
-
-    for repo, filename in voice_sources:
-        try:
-            downloaded = hf_hub_download(repo_id=repo, filename=filename)
-            if os.path.exists(downloaded) and os.path.getsize(downloaded) > 1000:
-                voices_path = downloaded
-                break
-        except Exception:
-            continue
-
-    if not voices_path:
-        # Emergency HTTP direct download from HuggingFace CDN
-        voices_path = "voices.bin"
-        if not os.path.exists(voices_path):
-            url = "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices.bin"
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=60) as resp, open(voices_path, "wb") as f:
-                f.write(resp.read())
+    # Retrieve voices json directly via hf_hub_download
+    try:
+        voices_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="voices.json")
+    except Exception:
+        voices_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="voices.bin")
 
     return Kokoro(model_path, voices_path)
 
