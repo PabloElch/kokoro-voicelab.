@@ -140,10 +140,8 @@ st.markdown("""
 # Replace lines 140-146 in app.py with this:
 @st.cache_resource(show_spinner=False)
 def load_onnx_kokoro():
-    model_path = hf_hub_download(
-        repo_id="onnx-community/Kokoro-82M-ONNX", 
-        filename="onnx/model.onnx"
-    )
+    # Automatically downloads model.onnx and voices.bin/voices.json from the correct ONNX repo
+    return Kokoro.from_pretrained()
     voices_path = hf_hub_download(
         repo_id="hexgrad/Kokoro-82M", 
         filename="voices.json"
