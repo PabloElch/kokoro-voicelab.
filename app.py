@@ -138,11 +138,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Direct Stable Asset Loader
+# 3. Direct Subfolder Asset Loader
 @st.cache_resource(show_spinner=False)
 def load_onnx_kokoro():
     try:
-        m_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="model.onnx")
+        m_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/model.onnx")
         v_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="voices.bin")
         return Kokoro(m_path, v_path)
     except Exception as e:
