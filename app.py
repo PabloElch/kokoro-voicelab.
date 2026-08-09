@@ -17,14 +17,14 @@ st.set_page_config(
 # Restrict PyTorch CPU threads to stop memory/CPU spikes
 torch.set_num_threads(1)
 
-# 2. Animated Gemini Neon Gradient & Glassmorphism Styling
+# 2. Moderated Gemini Neon Gradient & White Text Editor Styling
 st.markdown("""
 <style>
-    /* Full App Animated Gemini Neon Background */
+    /* Deeper, Moderated Gemini Neon Mesh Background */
     .stApp {
-        background: linear-gradient(-45deg, #0f172a, #1e1b4b, #311042, #0284c7, #4f46e5);
+        background: linear-gradient(-45deg, #090d16, #14112e, #1f0a2a, #075985, #312e81);
         background-size: 400% 400%;
-        animation: geminiGradient 14s ease infinite;
+        animation: geminiGradient 16s ease infinite;
     }
 
     @keyframes geminiGradient {
@@ -38,9 +38,21 @@ st.markdown("""
         background: transparent !important;
     }
 
+    /* Text Area Input Text and Placeholder White Styling */
+    .stTextArea textarea {
+        color: #ffffff !important;
+        background-color: rgba(15, 23, 42, 0.75) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 12px !important;
+    }
+
+    .stTextArea textarea::placeholder {
+        color: rgba(255, 255, 255, 0.75) !important;
+    }
+
     /* Sidebar Glassmorphism */
     section[data-testid="stSidebar"] {
-        background: rgba(15, 23, 42, 0.65) !important;
+        background: rgba(10, 15, 29, 0.75) !important;
         backdrop-filter: blur(12px);
         border-right: 1px solid rgba(255, 255, 255, 0.1);
     }
@@ -49,11 +61,11 @@ st.markdown("""
     .hero-container {
         text-align: center;
         padding: 2.2rem 1.5rem;
-        background: rgba(15, 23, 42, 0.55);
+        background: rgba(15, 23, 42, 0.65);
         backdrop-filter: blur(16px);
         border-radius: 20px;
         border: 1px solid rgba(255, 255, 255, 0.12);
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
         margin-bottom: 2rem;
     }
 
@@ -65,7 +77,7 @@ st.markdown("""
         letter-spacing: 1px;
     }
 
-    /* Glowing Animated Gradient text specifically for LENCHO */
+    /* Glowing Animated Gradient text for LENCHO */
     .lencho-highlight {
         background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc, #f472b6, #38bdf8);
         background-size: 300% 300%;
@@ -91,11 +103,11 @@ st.markdown("""
 
     /* Studio Input Card Glassmorphism */
     div[data-testid="stVerticalBlock"] > div[style*="border"] {
-        background: rgba(15, 23, 42, 0.6) !important;
+        background: rgba(15, 23, 42, 0.65) !important;
         backdrop-filter: blur(16px) !important;
         border-radius: 16px !important;
         border: 1px solid rgba(255, 255, 255, 0.12) !important;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
     }
 
     /* Neon Pulse Button */
