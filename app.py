@@ -1,6 +1,5 @@
 import os
 import tempfile
-import urllib.request
 import numpy as np
 import soundfile as sf
 import streamlit as st
@@ -139,38 +138,27 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Resilient v1.0 Asset Loader
+# 3. Multi-Source Resilient Asset Loader
 @st.cache_resource(show_spinner=False)
 def load_onnx_kokoro():
-    try:
-        m_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-v1.0-ONNX", filename="kokoro-v1.0.onnx")
-        v_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-v1.0-ONNX", filename="voices-v1.0.bin")
-        return Kokoro(m_path, v_path)
-    except Exception:
-        pass
-
-    cache_dir = tempfile.gettempdir()
-    model_path = os.path.join(cache_dir, "kokoro-v1.0.onnx")
-    voices_path = os.path.join(cache_dir, "voices-v1.0.bin")
-
-    model_url = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/kokoro-v1.0.onnx"
-    voices_url = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/voices-v1.0.bin"
-    headers = {"User-Agent": "Mozilla/5.0"}
-
-    try:
-        if not os.path.exists(model_path):
-            req = urllib.request.Request(model_url, headers=headers)
-            with urllib.request.urlopen(req) as resp, open(model_path, "wb") as out_file:
-                out_file.write(resp.read())
-
-        if not os.path.exists(voices_path):
-            req = urllib.request.Request(voices_url, headers=headers)
-            with urllib.request.urlopen(req) as resp, open(voices_path, "wb") as out_file:
-                out_file.write(resp.read())
-
-        return Kokoro(model_path, voices_path)
-    except Exception as e:
-        raise RuntimeError(f"Failed to fetch Kokoro ONNX model and voices: {e}")
+    sources = [
+        ("onnx-community/Kokoro-82M-ONNX", "model.onnx", "voices.bin"),
+        ("onnx-community/Kokoro-82M-ONNX", "onnx/model.onnx", "voices.bin"),
+        ("onnx-community/Kokoro-82M-v1.0-ONNX", "kokoro-v1.0.onnx", "voices-v1.0.bin"),
+        ("hexgrad/Kokoro-82M", "kokoro-v0_19.onnx", "voices.json"),
+    ]
+    
+    last_exception = None
+    for repo_id, model_file, voices_file in sources:
+        try:
+            m_path = hf_hub_download(repo_id=repo_id, filename=model_file)
+            v_path = hf_hub_download(repo_id=repo_id, filename=voices_file)
+            return Kokoro(m_path, v_path)
+        except Exception as e:
+            last_exception = e
+            continue
+            
+    raise RuntimeError(f"All download fallback sources failed. Last error: {last_exception}")
 
 VOICE_MAP = {
     "🇺🇸 Hinsene (American Female - Warm)": "af_heart",
