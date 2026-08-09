@@ -141,17 +141,15 @@ st.markdown("""
 # 3. Clean Native Hugging Face Hub Loader
 @st.cache_resource(show_spinner=False)
 def load_onnx_kokoro():
-    # Retrieve ONNX weights directly via hf_hub_download
     try:
         model_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="kokoro-v0_19.onnx")
     except Exception:
         model_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/model.onnx")
 
-    # Retrieve voices json directly via hf_hub_download
     try:
         voices_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="voices.json")
     except Exception:
-        voices_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="voices.bin")
+        voices_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="voices.json")
 
     return Kokoro(model_path, voices_path)
 
