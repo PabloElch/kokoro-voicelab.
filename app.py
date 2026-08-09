@@ -143,8 +143,8 @@ st.markdown("""
 @st.cache_resource(show_spinner=False)
 def load_onnx_kokoro():
     try:
-        m_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/kokoro-v1.0.onnx")
-        v_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="voices-v1.0.bin")
+        m_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-v1.0-ONNX", filename="kokoro-v1.0.onnx")
+        v_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-v1.0-ONNX", filename="voices-v1.0.bin")
         return Kokoro(m_path, v_path)
     except Exception:
         pass
@@ -153,8 +153,8 @@ def load_onnx_kokoro():
     model_path = os.path.join(cache_dir, "kokoro-v1.0.onnx")
     voices_path = os.path.join(cache_dir, "voices-v1.0.bin")
 
-    model_url = "https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/onnx/kokoro-v1.0.onnx"
-    voices_url = "https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/voices-v1.0.bin"
+    model_url = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/kokoro-v1.0.onnx"
+    voices_url = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/voices-v1.0.bin"
     headers = {"User-Agent": "Mozilla/5.0"}
 
     try:
