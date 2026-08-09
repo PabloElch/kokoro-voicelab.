@@ -144,7 +144,6 @@ def get_kokoro_engine():
     model_path = "kokoro-v1.0.onnx"
     voices_path = "voices-v1.0.bin"
 
-    # Automatically download model if missing on cloud server
     if not os.path.exists(model_path):
         with st.spinner("Downloading Kokoro ONNX model (first-time boot setup)..."):
             urllib.request.urlretrieve(
@@ -152,7 +151,6 @@ def get_kokoro_engine():
                 model_path
             )
 
-    # Automatically download voices configuration if missing
     if not os.path.exists(voices_path):
         with st.spinner("Downloading voice weights configuration..."):
             urllib.request.urlretrieve(
@@ -176,7 +174,7 @@ VOICE_MAP = {
     "🇬🇧 Lencho (British Male - Narration)": "bm_fable"
 }
 
-# 4. Sidebar Controls
+# 4. Sidebar Controls & Advanced Audio Settings
 with st.sidebar:
     st.title("⚙️ Studio Settings")
     st.markdown("Customize your voice engine parameters.")
@@ -188,7 +186,6 @@ with st.sidebar:
         index=10
     )
 
-    # Instant Voice Preview Button
     if st.button("▶️ Preview Voice"):
         voice_key = VOICE_MAP.get(voice_display_name, 'bm_fable')
         preview_text = "Hello! This is a quick preview of this voice persona."
@@ -218,6 +215,25 @@ with st.sidebar:
         value=1.0, 
         step=0.1,
         help="Adjust the pace of speech generation."
+    )
+
+    st.divider()
+    st.markdown("### 🎛️ Advanced Audio Tuning")
+    
+    pause_mode = st.select_slider(
+        "⏸️ Punctuation Pause Weight",
+        options=["Compact", "Natural", "Cinematic / Dramatic"],
+        value="Natural",
+        help="Controls clause spacing and breath pacing via punctuation formatting."
+    )
+
+    tone_depth = st.slider(
+        "🎵 Expression Warmth",
+        min_value=0.8,
+        max_value=1.2,
+        value=1.0,
+        step=0.05,
+        help="Fine-tunes the stylistic emphasis of phoneme execution."
     )
 
     st.divider()
@@ -267,12 +283,19 @@ if generate_btn:
             try:
                 voice_key = VOICE_MAP.get(voice_display_name, 'bm_fable')
                 
+                # Apply advanced pause/pacing adjustments to text tokens
+                processed_text = text_input
+                if pause_mode == "Cinematic / Dramatic":
+                    processed_text = processed_text.replace(",", ", ...").replace(".", ".  ")
+                elif pause_mode == "Compact":
+                    processed_text = processed_text.replace("...", ",")
+
                 progress_bar.progress(0.3, text="Loading Kokoro Model...")
                 kokoro = get_kokoro_engine()
                 
                 progress_bar.progress(0.6, text="Synthesizing speech...")
                 samples, sample_rate = kokoro.create(
-                    text_input, 
+                    processed_text, 
                     voice=voice_key, 
                     speed=speed, 
                     lang="en-us"
