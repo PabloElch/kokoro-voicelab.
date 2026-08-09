@@ -14,10 +14,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize Session State with a strict history limit to save RAM (capped at 2 items)
-if "history" not in st.session_state:
-    st.session_state.history = []
-
 # 2. Modern White-Card UI Styling
 st.markdown("""
 <style>
@@ -308,21 +304,6 @@ if generate_btn:
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
                     sf.write(temp_file.name, samples, sample_rate)
                     
-                    with open(temp_file.name, "rb") as f:
-                        audio_bytes = f.read()
-
-                    # Save to history but strictly keep only the latest 2 items to prevent memory overload
-                    history_item = {
-                        "text": text_input,
-                        "voice": voice_display_name,
-                        "speed": speed,
-                        "audio_bytes": audio_bytes,
-                        "filename": f"lencho_latera_voice_{len(st.session_state.history)+1}.wav"
-                    }
-                    st.session_state.history.insert(0, history_item)
-                    if len(st.session_state.history) > 2:
-                        st.session_state.history.pop()  # Drop oldest item from RAM
-
                     progress_bar.progress(1.0, text="Complete!")
 
                     col_audio, col_dl = st.columns([3, 1])
@@ -345,33 +326,3 @@ if generate_btn:
                 progress_bar.empty()
                 st.error("⚠️ An internal error occurred during synthesis:")
                 st.exception(e)
-
-# Session History & Archive Section (Strictly capped at 2 items to prevent memory limits)
-if st.session_state.history:
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("<h3 style='color: white;'>📜 Recent Session Archive (Last 2)</h3>", unsafe_allow_html=True)
-    with st.container(border=True):
-        for idx, item in enumerate(st.session_state.history):
-            item_num = len(st.session_state.history) - idx
-            st.markdown(f"**#{item_num} | Persona:** `{item['voice']}` | **Speed:** `{item['speed']}x`")
-            snippet = item['text'][:100] + "..." if len(item['text']) > 100 else item['text']
-            st.caption(f"**Script:** {snippet}")
-            
-            hist_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-            hist_temp.write(item['audio_bytes'])
-            hist_temp.close()
-            
-            col_ha, col_hd = st.columns([3, 1])
-            with col_ha:
-                st.audio(hist_temp.name, format="audio/wav")
-            with col_hd:
-                st.download_button(
-                    label="📥 Download",
-                    data=item['audio_bytes'],
-                    file_name=item['filename'],
-                    mime="audio/wav",
-                    key=f"history_download_{idx}",
-                    use_container_width=True
-                )
-            if idx < len(st.session_state.history) - 1:
-                st.divider()
