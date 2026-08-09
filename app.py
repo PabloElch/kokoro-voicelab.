@@ -139,32 +139,22 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Triple-Failover Model & Voices Loader
+# 3. Resilient v1.0 Asset Loader
 @st.cache_resource(show_spinner=False)
 def load_onnx_kokoro():
-    # Attempt 1: Standard ONNX Community Repository
     try:
-        m_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/model.onnx")
-        v_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="voices.bin")
+        m_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/kokoro-v1.0.onnx")
+        v_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="voices-v1.0.bin")
         return Kokoro(m_path, v_path)
     except Exception:
         pass
 
-    # Attempt 2: Hybrid Loader (ONNX model + Hexgrad voices)
-    try:
-        m_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/model.onnx")
-        v_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="voices.json")
-        return Kokoro(m_path, v_path)
-    except Exception:
-        pass
-
-    # Attempt 3: Direct Raw HF Endpoints
     cache_dir = tempfile.gettempdir()
-    model_path = os.path.join(cache_dir, "kokoro_model.onnx")
-    voices_path = os.path.join(cache_dir, "kokoro_voices.bin")
+    model_path = os.path.join(cache_dir, "kokoro-v1.0.onnx")
+    voices_path = os.path.join(cache_dir, "voices-v1.0.bin")
 
-    model_url = "https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/onnx/model.onnx"
-    voices_url = "https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/voices.bin"
+    model_url = "https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/onnx/kokoro-v1.0.onnx"
+    voices_url = "https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/voices-v1.0.bin"
     headers = {"User-Agent": "Mozilla/5.0"}
 
     try:
