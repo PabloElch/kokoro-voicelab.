@@ -1,4 +1,5 @@
 streamlit
-kokoro
+kokoro-onnx
+onnxruntime
 soundfile
 numpy
