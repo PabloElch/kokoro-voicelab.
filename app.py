@@ -3,7 +3,7 @@ import tempfile
 import numpy as np
 import soundfile as sf
 import streamlit as st
-from kokoro import KPipeline
+from kokoro_onnx import Kokoro
 
 # 1. Page Configuration
 st.set_page_config(
@@ -137,23 +137,27 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Cached KPipeline Initializer
+# 3. Cached Kokoro Model Initializer
 @st.cache_resource(show_spinner=False)
-def get_pipeline(lang_code: str):
-    return KPipeline(lang_code=lang_code)
+def get_kokoro_engine():
+    # Looks for model files in the repository directory.
+    # Make sure you include kokoro-v1.0.onnx and voices-v1.0.bin in your repo!
+    model_path = "kokoro-v1.0.onnx"
+    voices_path = "voices-v1.0.bin"
+    return Kokoro(model_path, voices_path)
 
 VOICE_MAP = {
-    "🇺🇸 Hinsene (American Female - Warm)": ("af_heart", "a"),
-    "🇺🇸 Barashe (American Female - Soft)": ("af_bella", "a"),
-    "🇺🇸 Likitu (American Female - Clear)": ("af_nicole", "a"),
-    "🇺🇸 Lalise (American Female - News)": ("af_sarah", "a"),
-    "🇺🇸 Latu (American Female - Casual)": ("af_sky", "a"),
-    "🇺🇸 Lamessa (American Male - Deep)": ("am_adam", "a"),
-    "🇺🇸 Latera (American Male - Crisp)": ("am_michael", "a"),
-    "🇬🇧 Bontu (British Female - Professional)": ("bf_emma", "b"),
-    "🇬🇧 Buze (British Female - Warm)": ("bf_isabella", "b"),
-    "🇬🇧 Lemi (British Male - Expressive)": ("bm_george", "b"),
-    "🇬🇧 Lencho (British Male - Narration)": ("bm_fable", "b")
+    "🇺🇸 Hinsene (American Female - Warm)": "af_heart",
+    "🇺🇸 Barashe (American Female - Soft)": "af_bella",
+    "🇺🇸 Likitu (American Female - Clear)": "af_nicole",
+    "🇺🇸 Lalise (American Female - News)": "af_sarah",
+    "🇺🇸 Latu (American Female - Casual)": "af_sky",
+    "🇺🇸 Lamessa (American Male - Deep)": "am_adam",
+    "🇺🇸 Latera (American Male - Crisp)": "am_michael",
+    "🇬🇧 Bontu (British Female - Professional)": "bf_emma",
+    "🇬🇧 Buze (British Female - Warm)": "bf_isabella",
+    "🇬🇧 Lemi (British Male - Expressive)": "bm_george",
+    "🇬🇧 Lencho (British Male - Narration)": "bm_fable"
 }
 
 # 4. Sidebar Controls
@@ -178,7 +182,7 @@ with st.sidebar:
     )
 
     st.divider()
-    st.caption("🚀 **Kokoro Pipeline Engine:** Active.")
+    st.caption("🚀 **Kokoro-ONNX Pipeline Engine:** Active.")
 
 # 5. Hero Header
 st.markdown("""
@@ -220,27 +224,26 @@ if generate_btn:
     else:
         st.markdown("<h3 style='color: white;'>🔊 Studio Render Output</h3>", unsafe_allow_html=True)
         with st.container(border=True):
-            progress_bar = st.progress(0.0, text="Initializing Pipeline...")
+            progress_bar = st.progress(0.0, text="Initializing ONNX Engine...")
             try:
-                voice_key, lang_code = VOICE_MAP.get(voice_display_name, ('bm_fable', 'b'))
+                voice_key = VOICE_MAP.get(voice_display_name, 'bm_fable')
                 
-                progress_bar.progress(0.2, text="Loading KPipeline...")
-                pipeline = get_pipeline(lang_code=lang_code)
+                progress_bar.progress(0.3, text="Loading Kokoro Model...")
+                kokoro = get_kokoro_engine()
                 
-                progress_bar.progress(0.5, text="Synthesizing audio chunks...")
-                generator = pipeline(text_input, voice=voice_key, speed=speed)
-                
-                audio_chunks = []
-                for i, (gs, ps, audio) in enumerate(generator):
-                    if audio is not None and len(audio) > 0:
-                        audio_chunks.append(audio)
+                progress_bar.progress(0.6, text="Synthesizing speech...")
+                samples, sample_rate = kokoro.create(
+                    text_input, 
+                    voice=voice_key, 
+                    speed=speed, 
+                    lang="en-us"
+                )
 
-                if len(audio_chunks) > 0:
-                    progress_bar.progress(0.9, text="Combining audio and generating WAV file...")
-                    full_audio = np.concatenate(audio_chunks)
+                if samples is not None and len(samples) > 0:
+                    progress_bar.progress(0.9, text="Formatting WAV file...")
                     
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-                    sf.write(temp_file.name, full_audio, 24000)
+                    sf.write(temp_file.name, samples, sample_rate)
                     
                     progress_bar.progress(1.0, text="Complete!")
 
@@ -258,7 +261,7 @@ if generate_btn:
                             )
                 else:
                     progress_bar.empty()
-                    st.error("No audio chunks generated.")
+                    st.error("No audio generated.")
 
             except Exception as e:
                 progress_bar.empty()
