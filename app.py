@@ -139,14 +139,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Resilient Asset Loader
+# 3. Triple-Failover Model & Voices Loader
 @st.cache_resource(show_spinner=False)
 def load_onnx_kokoro():
-    cache_dir = tempfile.gettempdir()
-    model_path = os.path.join(cache_dir, "kokoro-v0_19.onnx")
-    voices_path = os.path.join(cache_dir, "voices.json")
-
-    # Primary: Hugging Face onnx-community repository
+    # Attempt 1: Standard ONNX Community Repository
     try:
         m_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/model.onnx")
         v_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="voices.bin")
@@ -154,15 +150,34 @@ def load_onnx_kokoro():
     except Exception:
         pass
 
-    # Secondary: Direct Asset Fetch
-    onnx_url = "https://github.com/remsaim/kokoro-onnx/releases/download/v0.19/kokoro-v0_19.onnx"
-    voices_url = "https://github.com/remsaim/kokoro-onnx/releases/download/v0.19/voices.json"
+    # Attempt 2: Hybrid Loader (ONNX model + Hexgrad voices)
+    try:
+        m_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/model.onnx")
+        v_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="voices.json")
+        return Kokoro(m_path, v_path)
+    except Exception:
+        pass
+
+    # Attempt 3: Direct Raw HF Endpoints
+    cache_dir = tempfile.gettempdir()
+    model_path = os.path.join(cache_dir, "kokoro_model.onnx")
+    voices_path = os.path.join(cache_dir, "kokoro_voices.bin")
+
+    model_url = "https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/onnx/model.onnx"
+    voices_url = "https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/voices.bin"
+    headers = {"User-Agent": "Mozilla/5.0"}
 
     try:
         if not os.path.exists(model_path):
-            urllib.request.urlretrieve(onnx_url, model_path)
+            req = urllib.request.Request(model_url, headers=headers)
+            with urllib.request.urlopen(req) as resp, open(model_path, "wb") as out_file:
+                out_file.write(resp.read())
+
         if not os.path.exists(voices_path):
-            urllib.request.urlretrieve(voices_url, voices_path)
+            req = urllib.request.Request(voices_url, headers=headers)
+            with urllib.request.urlopen(req) as resp, open(voices_path, "wb") as out_file:
+                out_file.write(resp.read())
+
         return Kokoro(model_path, voices_path)
     except Exception as e:
         raise RuntimeError(f"Failed to fetch Kokoro ONNX model and voices: {e}")
