@@ -255,7 +255,7 @@ with st.sidebar:
 st.markdown("""
 <div class="hero-container">
     <div class="hero-title">🎙️ <span class="lencho-highlight">LENCHO X LATERA</span> AUDIO STUDIO</div>
-    <div class="hero-subtitle">Precision AI Voice Synthesis by <span class="lencho-highlight">Lencho</span> L & <span class="lencho-highlight">Latera</span> Lemessa</div>
+    <div class="hero-subtitle">Precision AI Voice Synthesis by <span class="lencho-highlight">Lencho</span> & <span class="lencho-highlight">Latera</span> Lemessa</div>
 </div>
 """, unsafe_allow_html=True)
 
