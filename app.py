@@ -138,20 +138,22 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Clean Native Hugging Face Hub Loader
+# 3. Paired-Asset Loader
 @st.cache_resource(show_spinner=False)
 def load_onnx_kokoro():
     try:
-        model_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="kokoro-v0_19.onnx")
-    except Exception:
         model_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/model.onnx")
+        voices_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="voices.bin")
+        return Kokoro(model_path, voices_path)
+    except Exception:
+        pass
 
     try:
+        model_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="kokoro-v0_19.onnx")
         voices_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="voices.json")
-    except Exception:
-        voices_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="voices.json")
-
-    return Kokoro(model_path, voices_path)
+        return Kokoro(model_path, voices_path)
+    except Exception as e:
+        raise RuntimeError(f"Failed to fetch Kokoro ONNX model and voices: {e}")
 
 VOICE_MAP = {
     "🇺🇸 Hinsene (American Female - Warm)": "af_heart",
