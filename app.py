@@ -1,11 +1,9 @@
 import tempfile
-import gc
-import os
-import numpy as np
 import soundfile as sf
 import streamlit as st
-import torch
-from kokoro import KPipeline
+import numpy as np
+from huggingface_hub import hf_hub_download
+from kokoro_onnx import Kokoro
 
 # 1. Page Configuration
 st.set_page_config(
@@ -14,10 +12,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# CPU Performance Tuning
-num_cores = max(1, min(4, os.cpu_count() or 2))
-torch.set_num_threads(num_cores)
 
 # 2. Modern White-Card UI Styling
 st.markdown("""
@@ -143,10 +137,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Dynamic Pipeline Cache by Language Code
-@st.cache_resource(max_entries=2)
-def load_pipeline(lang_code: str):
-    return KPipeline(lang_code=lang_code)
+# 3. Cache ONNX Engine
+@st.cache_resource(show_spinner=False)
+def load_onnx_kokoro():
+    model_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="kokoro-v0_19.onnx")
+    voices_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="voices.json")
+    return Kokoro(model_path, voices_path)
 
 VOICE_MAP = {
     "🇺🇸 Hinsene (American Female - Warm)": "af_heart",
@@ -184,13 +180,13 @@ with st.sidebar:
     )
 
     st.divider()
-    st.caption("💡 **Tip:** American voices use 'a' accent engine, British voices use 'b' accent engine.")
+    st.caption("🚀 **ONNX Speed Acceleration:** Active for fast Cloud CPU rendering.")
 
 # 5. Hero Header
 st.markdown("""
 <div class="hero-container">
     <div class="hero-title">🎧 <span class="lencho-highlight">LENCHOS</span> VOICE LAB</div>
-    <div class="hero-subtitle">Studio-Grade Text-to-Speech Engine Created by <span class="lencho-highlight">Lencho</span> Lemessa For  <span class="lencho-highlight">Latera</span> Lemessa </div>
+    <div class="hero-subtitle">Studio-Grade Text-to-Speech Engine Created by <span class="lencho-highlight">Lencho</span> Lemessa For <span class="lencho-highlight">Latera</span> Lemessa </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -226,38 +222,29 @@ if generate_btn:
     else:
         st.markdown("<h3 style='color: white;'>🔊 Studio Render Output</h3>", unsafe_allow_html=True)
         with st.container(border=True):
-            progress_bar = st.progress(0.0, text="Initializing TTS Pipeline...")
+            progress_bar = st.progress(0.0, text="Initializing ONNX Engine...")
             try:
                 actual_voice = VOICE_MAP.get(voice_display_name, 'bm_fable')
+                lang_code = "en-gb" if actual_voice.startswith("b") else "en-us"
                 
-                # Automatically extract 'a' or 'b' based on selected voice
-                lang_code = actual_voice[0] if actual_voice else 'a'
+                progress_bar.progress(0.2, text="Loading ONNX Runtime...")
+                kokoro = load_onnx_kokoro()
                 
-                progress_bar.progress(0.1, text=f"Loading pipeline for language '{lang_code}'...")
-                pipeline = load_pipeline(lang_code)
-                
-                audio_chunks = []
-                progress_bar.progress(0.3, text="Synthesizing speech...")
-                
-                with torch.no_grad():
-                    generator = pipeline(text_input, voice=actual_voice, speed=speed)
-                    for idx, (_, _, audio) in enumerate(generator):
-                        if audio is not None:
-                            audio_chunks.append(audio)
-                        pct = min(0.90, 0.3 + (idx + 1) * 0.1)
-                        progress_bar.progress(pct, text=f"Rendering audio segment {idx + 1}...")
+                progress_bar.progress(0.5, text="Synthesizing audio...")
+                samples, sample_rate = kokoro.create(
+                    text_input, 
+                    voice=actual_voice, 
+                    speed=speed, 
+                    lang=lang_code
+                )
 
-                if audio_chunks:
-                    progress_bar.progress(0.95, text="Saving WAV file...")
-                    full_audio = np.concatenate(audio_chunks)
+                if len(samples) > 0:
+                    progress_bar.progress(0.9, text="Generating WAV file...")
                     
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-                    sf.write(temp_file.name, full_audio, 24000)
+                    sf.write(temp_file.name, samples, sample_rate)
                     
                     progress_bar.progress(1.0, text="Complete!")
-                    
-                    del audio_chunks, full_audio
-                    gc.collect()
 
                     col_audio, col_dl = st.columns([3, 1])
                     with col_audio:
@@ -273,7 +260,7 @@ if generate_btn:
                             )
                 else:
                     progress_bar.empty()
-                    st.error("No audio generated. Please verify text input.")
+                    st.error("No audio generated.")
 
             except Exception as e:
                 progress_bar.empty()
