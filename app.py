@@ -14,15 +14,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Restrict PyTorch CPU threads to stop memory/CPU spikes
+# Restrict PyTorch CPU threads to preserve memory and stop CPU spikes
 torch.set_num_threads(1)
 
-# 2. Moderated Gemini Neon Gradient & White Text Editor Styling
+# 2. Modern White-Card UI on Neon Background Styling
 st.markdown("""
 <style>
-    /* Deeper, Moderated Gemini Neon Mesh Background */
+    /* Neon Gradient Background */
     .stApp {
-        background: linear-gradient(-45deg, #090d16, #14112e, #1f0a2a, #075985, #312e81);
+        background: linear-gradient(-45deg, #0f172a, #311042, #1e1b4b, #0284c7, #6366f1);
         background-size: 400% 400%;
         animation: geminiGradient 16s ease infinite;
     }
@@ -38,54 +38,44 @@ st.markdown("""
         background: transparent !important;
     }
 
-    /* Text Area Input Text and Placeholder White Styling */
-    .stTextArea textarea {
-        color: #ffffff !important;
-        background-color: rgba(15, 23, 42, 0.75) !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-        border-radius: 12px !important;
-    }
-
-    .stTextArea textarea::placeholder {
-        color: rgba(255, 255, 255, 0.75) !important;
-    }
-
-    /* Sidebar Glassmorphism */
+    /* WHITE SIDEBAR CARD STYLING */
     section[data-testid="stSidebar"] {
-        background: rgba(10, 15, 29, 0.75) !important;
-        backdrop-filter: blur(12px);
-        border-right: 1px solid rgba(255, 255, 255, 0.1);
+        background-color: #ffffff !important;
+        border-right: 1px solid #e2e8f0 !important;
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15) !important;
     }
 
-    /* Hero Banner with Glowing LENCHO Highlight */
+    section[data-testid="stSidebar"] * {
+        color: #0f172a !important;
+    }
+
+    /* WHITE HERO CONTAINER */
     .hero-container {
         text-align: center;
-        padding: 2.2rem 1.5rem;
-        background: rgba(15, 23, 42, 0.65);
-        backdrop-filter: blur(16px);
+        padding: 2rem 1.5rem;
+        background: #ffffff;
         border-radius: 20px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
         margin-bottom: 2rem;
     }
 
     .hero-title {
         font-size: 2.8rem;
         font-weight: 900;
-        color: #ffffff;
+        color: #0f172a;
         margin: 0;
         letter-spacing: 1px;
     }
 
-    /* Glowing Animated Gradient text for LENCHO */
+    /* Glowing Animated Gradient text specifically for LENCHO */
     .lencho-highlight {
-        background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc, #f472b6, #38bdf8);
+        background: linear-gradient(90deg, #2563eb, #7c3aed, #db2777, #2563eb);
         background-size: 300% 300%;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         animation: glowingText 4s linear infinite;
         font-weight: 900;
-        text-shadow: 0 0 20px rgba(129, 140, 248, 0.6);
     }
 
     @keyframes glowingText {
@@ -95,39 +85,72 @@ st.markdown("""
     }
 
     .hero-subtitle {
-        color: #cbd5e1;
+        color: #475569;
         font-size: 1.1rem;
         margin-top: 0.5rem;
-        font-weight: 400;
+        font-weight: 500;
     }
 
-    /* Studio Input Card Glassmorphism */
+    /* ALL STUDIO CARDS & CONTAINERS IN WHITE */
     div[data-testid="stVerticalBlock"] > div[style*="border"] {
-        background: rgba(15, 23, 42, 0.65) !important;
-        backdrop-filter: blur(16px) !important;
-        border-radius: 16px !important;
-        border: 1px solid rgba(255, 255, 255, 0.12) !important;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4) !important;
+        background-color: #ffffff !important;
+        border-radius: 18px !important;
+        border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+        padding: 1.5rem !important;
     }
 
-    /* Neon Pulse Button */
+    /* Force text inside cards to be dark and crisp */
+    div[data-testid="stVerticalBlock"] > div[style*="border"] h1,
+    div[data-testid="stVerticalBlock"] > div[style*="border"] h2,
+    div[data-testid="stVerticalBlock"] > div[style*="border"] h3,
+    div[data-testid="stVerticalBlock"] > div[style*="border"] p,
+    div[data-testid="stVerticalBlock"] > div[style*="border"] span,
+    div[data-testid="stVerticalBlock"] > div[style*="border"] label {
+        color: #0f172a !important;
+    }
+
+    /* Stat/Caption labels inside cards */
+    .stCaption, [data-testid="stCaptionContainer"] {
+        color: #334155 !important;
+        font-size: 0.95rem !important;
+    }
+
+    /* SCRIPT EDITOR TEXT AREA STYLING */
+    .stTextArea textarea {
+        color: #0f172a !important;
+        background-color: #f8fafc !important;
+        border: 1.5px solid #cbd5e1 !important;
+        border-radius: 12px !important;
+        font-size: 1rem !important;
+    }
+
+    .stTextArea textarea:focus {
+        border-color: #6366f1 !important;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
+    }
+
+    .stTextArea textarea::placeholder {
+        color: #64748b !important;
+    }
+
+    /* NEON ACCENT BUTTON */
     div.stButton > button {
         width: 100%;
-        background: linear-gradient(90deg, #6366f1 0%, #a855f7 50%, #ec4899 100%) !important;
-        background-size: 200% 200% !important;
-        color: white !important;
+        background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 50%, #ec4899 100%) !important;
+        color: #ffffff !important;
         font-weight: 700 !important;
         font-size: 1.1rem !important;
         padding: 0.75rem 1.5rem !important;
         border-radius: 12px !important;
         border: none !important;
-        box-shadow: 0 0 20px rgba(168, 85, 247, 0.4) !important;
+        box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4) !important;
         transition: all 0.3s ease-in-out !important;
     }
 
     div.stButton > button:hover {
-        transform: translateY(-2px) scale(1.01) !important;
-        box-shadow: 0 0 30px rgba(236, 72, 153, 0.7) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(236, 72, 153, 0.6) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -151,7 +174,7 @@ VOICE_MAP = {
     "🇬🇧 Lencho (British Male - Narration)": "bm_fable"
 }
 
-# 4. Sidebar Controls
+# 4. White Sidebar Controls
 with st.sidebar:
     st.title("⚙️ Studio Settings")
     st.markdown("Customize your voice engine parameters.")
@@ -175,7 +198,7 @@ with st.sidebar:
     st.divider()
     st.caption("💡 **Tip:** Keep scripts concise for faster generation.")
 
-# 5. Neon Hero Header
+# 5. Hero Header
 st.markdown("""
 <div class="hero-container">
     <div class="hero-title">🎧 <span class="lencho-highlight">LENCHO</span> VOICE LAB</div>
@@ -183,7 +206,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Main Studio Card
+# Main White Card Studio Input
 with st.container(border=True):
     st.subheader("📝 Script Editor")
     text_input = st.text_area(
@@ -214,7 +237,7 @@ if generate_btn:
     if not text_input.strip():
         st.warning("Please enter some text in the script editor first.")
     else:
-        st.markdown("### 🔊 Studio Render Output")
+        st.markdown("<h3 style='color: white;'>🔊 Studio Render Output</h3>", unsafe_allow_html=True)
         with st.container(border=True):
             with st.status("Initializing Kokoro Engine...", expanded=True) as status:
                 st.write("🧠 Loading model pipeline...")
@@ -249,6 +272,7 @@ if generate_btn:
                     
                     progress_bar.progress(1.0, text="Generation complete!")
                     
+                    # Garbage collection & memory freeing preserved
                     del audio_chunks, full_audio
                     gc.collect()
 
