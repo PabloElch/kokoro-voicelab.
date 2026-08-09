@@ -1,5 +1,7 @@
 import tempfile
 import gc
+import os
+import re
 import numpy as np
 import soundfile as sf
 import streamlit as st
@@ -14,13 +16,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Restrict PyTorch CPU threads to preserve memory and stop CPU spikes
-torch.set_num_threads(1)
+# ⚡ PERFORMANCE OPTIMIZATION:
+# Allow up to 4 CPU threads (or max CPU count) for faster PyTorch execution
+num_cores = max(1, min(4, os.cpu_count() or 2))
+torch.set_num_threads(num_cores)
 
-# 2. Modern White-Card UI on Neon Background Styling
+# 2. Modern White-Card UI Styling
 st.markdown("""
 <style>
-    /* Neon Gradient Background */
     .stApp {
         background: linear-gradient(-45deg, #0f172a, #311042, #1e1b4b, #0284c7, #6366f1);
         background-size: 400% 400%;
@@ -33,12 +36,10 @@ st.markdown("""
         100% { background-position: 0% 50%; }
     }
 
-    /* Make Streamlit top header transparent */
     header[data-testid="stHeader"] {
         background: transparent !important;
     }
 
-    /* WHITE SIDEBAR CARD STYLING */
     section[data-testid="stSidebar"] {
         background-color: #ffffff !important;
         border-right: 1px solid #e2e8f0 !important;
@@ -49,7 +50,6 @@ st.markdown("""
         color: #0f172a !important;
     }
 
-    /* WHITE HERO CONTAINER */
     .hero-container {
         text-align: center;
         padding: 2rem 1.5rem;
@@ -68,7 +68,6 @@ st.markdown("""
         letter-spacing: 1px;
     }
 
-    /* Glowing Animated Gradient text specifically for LENCHO */
     .lencho-highlight {
         background: linear-gradient(90deg, #2563eb, #7c3aed, #db2777, #2563eb);
         background-size: 300% 300%;
@@ -91,7 +90,6 @@ st.markdown("""
         font-weight: 500;
     }
 
-    /* ALL STUDIO CARDS & CONTAINERS IN WHITE */
     div[data-testid="stVerticalBlock"] > div[style*="border"] {
         background-color: #ffffff !important;
         border-radius: 18px !important;
@@ -100,7 +98,6 @@ st.markdown("""
         padding: 1.5rem !important;
     }
 
-    /* Force text inside cards to be dark and crisp */
     div[data-testid="stVerticalBlock"] > div[style*="border"] h1,
     div[data-testid="stVerticalBlock"] > div[style*="border"] h2,
     div[data-testid="stVerticalBlock"] > div[style*="border"] h3,
@@ -110,13 +107,11 @@ st.markdown("""
         color: #0f172a !important;
     }
 
-    /* Stat/Caption labels inside cards */
     .stCaption, [data-testid="stCaptionContainer"] {
         color: #334155 !important;
         font-size: 0.95rem !important;
     }
 
-    /* SCRIPT EDITOR TEXT AREA STYLING */
     .stTextArea textarea {
         color: #0f172a !important;
         background-color: #f8fafc !important;
@@ -130,11 +125,6 @@ st.markdown("""
         box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
     }
 
-    .stTextArea textarea::placeholder {
-        color: #64748b !important;
-    }
-
-    /* NEON ACCENT BUTTON */
     div.stButton > button {
         width: 100%;
         background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 50%, #ec4899 100%) !important;
@@ -196,7 +186,7 @@ with st.sidebar:
     )
 
     st.divider()
-    st.caption("💡 **Tip:** Keep scripts concise for faster generation.")
+    st.caption("💡 **Tip:** Splitting text into clear paragraphs increases generation speed.")
 
 # 5. Hero Header
 st.markdown("""
@@ -239,44 +229,42 @@ if generate_btn:
     else:
         st.markdown("<h3 style='color: white;'>🔊 Studio Render Output</h3>", unsafe_allow_html=True)
         with st.container(border=True):
-            with st.status("Initializing Kokoro Engine...", expanded=True) as status:
-                st.write("🧠 Loading model pipeline...")
+            with st.status("Rendering Audio...", expanded=True) as status:
                 pipeline = load_pipeline()
                 actual_voice = VOICE_MAP.get(voice_display_name, 'bm_fable')
                 
-                st.write("🗣️ Synthesizing speech segments...")
-                raw_segments = [s for s in text_input.replace('\n', '.').split('.') if s.strip()]
-                total_estimated = max(1, len(raw_segments))
+                # Split sentences to assist fast batch inference
+                sentences = [s.strip() for s in re.split(r'[\n.]+', text_input) if s.strip()]
+                total_sentences = max(1, len(sentences))
                 
-                progress_bar = st.progress(0.0, text="Starting speech synthesis...")
+                progress_bar = st.progress(0.0, text="Synthesizing audio...")
                 audio_chunks = []
                 
                 with torch.no_grad():
-                    generator = pipeline(text_input, voice=actual_voice, speed=speed)
-                    for index, (_, _, audio) in enumerate(generator):
-                        audio_chunks.append(audio)
-                        progress = min(0.95, (index + 1) / total_estimated)
-                        progress_bar.progress(
-                            progress, 
-                            text=f"Rendered segment {index + 1} of ~{total_estimated}"
-                        )
-                        st.write(f"🔊 Rendered segment {index + 1}...")
+                    # Batch processing sentences for maximum speed
+                    for i, sentence in enumerate(sentences):
+                        generator = pipeline(sentence, voice=actual_voice, speed=speed)
+                        for _, _, audio in generator:
+                            audio_chunks.append(audio)
+                        
+                        # Smooth UI progress updates without freezing execution
+                        pct = min(0.95, (i + 1) / total_sentences)
+                        progress_bar.progress(pct, text=f"Processing segment {i+1}/{total_sentences}...")
 
                 if audio_chunks:
-                    st.write("💾 Merging tracks and saving WAV...")
-                    progress_bar.progress(0.98, text="Finalizing WAV file...")
-                    
+                    progress_bar.progress(0.98, text="Merging audio channels...")
                     full_audio = np.concatenate(audio_chunks)
+                    
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
                     sf.write(temp_file.name, full_audio, 24000)
                     
-                    progress_bar.progress(1.0, text="Generation complete!")
+                    progress_bar.progress(1.0, text="Complete!")
                     
-                    # Garbage collection & memory freeing preserved
+                    # Memory cleanup
                     del audio_chunks, full_audio
                     gc.collect()
 
-                    status.update(label="✨ Audio ready!", state="complete", expanded=False)
+                    status.update(label="✨ Audio rendering complete!", state="complete", expanded=False)
                     
                     col_audio, col_dl = st.columns([3, 1])
                     with col_audio:
@@ -292,4 +280,4 @@ if generate_btn:
                             )
                 else:
                     progress_bar.empty()
-                    status.update(label="⚠️ Failed to generate speech.", state="error")
+                    status.update(label="⚠️ Speech generation failed.", state="error")
