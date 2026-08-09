@@ -3,8 +3,7 @@ import tempfile
 import numpy as np
 import soundfile as sf
 import streamlit as st
-from huggingface_hub import hf_hub_download
-from kokoro_onnx import Kokoro
+from kokoro import KPipeline
 
 # 1. Page Configuration
 st.set_page_config(
@@ -138,28 +137,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Direct Subfolder Asset Loader
+# 3. Cached KPipeline Initializer
 @st.cache_resource(show_spinner=False)
-def load_onnx_kokoro():
-    try:
-        m_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/model.onnx")
-        v_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="voices.bin")
-        return Kokoro(m_path, v_path)
-    except Exception as e:
-        raise RuntimeError(f"Failed to download Kokoro ONNX model from Hugging Face: {e}")
+def get_pipeline(lang_code: str):
+    return KPipeline(lang_code=lang_code)
 
 VOICE_MAP = {
-    "🇺🇸 Hinsene (American Female - Warm)": "af_heart",
-    "🇺🇸 Barashe (American Female - Soft)": "af_bella",
-    "🇺🇸 Likitu (American Female - Clear)": "af_nicole",
-    "🇺🇸 Lalise (American Female - News)": "af_sarah",
-    "🇺🇸 Latu (American Female - Casual)": "af_sky",
-    "🇺🇸 Lamessa (American Male - Deep)": "am_adam",
-    "🇺🇸 Latera (American Male - Crisp)": "am_michael",
-    "🇬🇧 Bontu (British Female - Professional)": "bf_emma",
-    "🇬🇧 Buze (British Female - Warm)": "bf_isabella",
-    "🇬🇧 Lemi (British Male - Expressive)": "bm_george",
-    "🇬🇧 Lencho (British Male - Narration)": "bm_fable"
+    "🇺🇸 Hinsene (American Female - Warm)": ("af_heart", "a"),
+    "🇺🇸 Barashe (American Female - Soft)": ("af_bella", "a"),
+    "🇺🇸 Likitu (American Female - Clear)": ("af_nicole", "a"),
+    "🇺🇸 Lalise (American Female - News)": ("af_sarah", "a"),
+    "🇺🇸 Latu (American Female - Casual)": ("af_sky", "a"),
+    "🇺🇸 Lamessa (American Male - Deep)": ("am_adam", "a"),
+    "🇺🇸 Latera (American Male - Crisp)": ("am_michael", "a"),
+    "🇬🇧 Bontu (British Female - Professional)": ("bf_emma", "b"),
+    "🇬🇧 Buze (British Female - Warm)": ("bf_isabella", "b"),
+    "🇬🇧 Lemi (British Male - Expressive)": ("bm_george", "b"),
+    "🇬🇧 Lencho (British Male - Narration)": ("bm_fable", "b")
 }
 
 # 4. Sidebar Controls
@@ -184,7 +178,7 @@ with st.sidebar:
     )
 
     st.divider()
-    st.caption("🚀 **ONNX Speed Acceleration:** Active for fast Cloud CPU rendering.")
+    st.caption("🚀 **Kokoro Pipeline Engine:** Active.")
 
 # 5. Hero Header
 st.markdown("""
@@ -226,27 +220,27 @@ if generate_btn:
     else:
         st.markdown("<h3 style='color: white;'>🔊 Studio Render Output</h3>", unsafe_allow_html=True)
         with st.container(border=True):
-            progress_bar = st.progress(0.0, text="Initializing ONNX Engine...")
+            progress_bar = st.progress(0.0, text="Initializing Pipeline...")
             try:
-                actual_voice = VOICE_MAP.get(voice_display_name, 'bm_fable')
-                lang_code = "en-gb" if actual_voice.startswith("b") else "en-us"
+                voice_key, lang_code = VOICE_MAP.get(voice_display_name, ('bm_fable', 'b'))
                 
-                progress_bar.progress(0.2, text="Loading ONNX Runtime...")
-                kokoro = load_onnx_kokoro()
+                progress_bar.progress(0.2, text="Loading KPipeline...")
+                pipeline = get_pipeline(lang_code=lang_code)
                 
-                progress_bar.progress(0.5, text="Synthesizing audio...")
-                samples, sample_rate = kokoro.create(
-                    text_input, 
-                    voice=actual_voice, 
-                    speed=speed, 
-                    lang=lang_code
-                )
+                progress_bar.progress(0.5, text="Synthesizing audio chunks...")
+                generator = pipeline(text_input, voice=voice_key, speed=speed)
+                
+                audio_chunks = []
+                for i, (gs, ps, audio) in enumerate(generator):
+                    if audio is not None and len(audio) > 0:
+                        audio_chunks.append(audio)
 
-                if len(samples) > 0:
-                    progress_bar.progress(0.9, text="Generating WAV file...")
+                if len(audio_chunks) > 0:
+                    progress_bar.progress(0.9, text="Combining audio and generating WAV file...")
+                    full_audio = np.concatenate(audio_chunks)
                     
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-                    sf.write(temp_file.name, samples, sample_rate)
+                    sf.write(temp_file.name, full_audio, 24000)
                     
                     progress_bar.progress(1.0, text="Complete!")
 
@@ -264,7 +258,7 @@ if generate_btn:
                             )
                 else:
                     progress_bar.empty()
-                    st.error("No audio generated.")
+                    st.error("No audio chunks generated.")
 
             except Exception as e:
                 progress_bar.empty()
