@@ -45,6 +45,14 @@ if st.button("✨ Generate Audio", type="primary"):
             actual_voice = VOICE_MAP.get(voice_display_name, 'af_heart')
             
             st.write("🗣️ Generating speech segments...")
+            
+            # Estimate total segments based on punctuation/line breaks to calculate percentage
+            raw_segments = [s for s in text_input.replace('\n', '.').split('.') if s.strip()]
+            total_estimated = max(1, len(raw_segments))
+            
+            # Initialize progress bar inside status container
+            progress_bar = st.progress(0.0, text="Starting speech generation...")
+            
             audio_chunks = []
             
             # Disable gradient tracking to prevent RAM accumulation
@@ -52,13 +60,25 @@ if st.button("✨ Generate Audio", type="primary"):
                 generator = pipeline(text_input, voice=actual_voice, speed=speed)
                 for index, (_, _, audio) in enumerate(generator):
                     audio_chunks.append(audio)
+                    
+                    # Update progress bar dynamically (capped at 0.95 until final write)
+                    progress = min(0.95, (index + 1) / total_estimated)
+                    progress_bar.progress(
+                        progress, 
+                        text=f"Rendered segment {index + 1} of ~{total_estimated}"
+                    )
                     st.write(f"🔊 Rendered segment {index + 1}...")
 
             if audio_chunks:
                 st.write("💾 Merging segments and saving WAV...")
+                progress_bar.progress(0.98, text="Finalizing WAV file...")
+                
                 full_audio = np.concatenate(audio_chunks)
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
                 sf.write(temp_file.name, full_audio, 24000)
+                
+                # Mark progress bar as complete
+                progress_bar.progress(1.0, text="Generation complete!")
                 
                 # Clear memory immediately after write
                 del audio_chunks, full_audio
@@ -75,4 +95,5 @@ if st.button("✨ Generate Audio", type="primary"):
                         mime="audio/wav"
                     )
             else:
+                progress_bar.empty()
                 status.update(label="⚠️ Failed to generate speech.", state="error")
