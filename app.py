@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 # ⚡ PERFORMANCE OPTIMIZATION:
-# Allow up to 4 CPU threads (or max CPU count) for faster PyTorch execution
+# Allow multi-threading on CPU for faster PyTorch execution
 num_cores = max(1, min(4, os.cpu_count() or 2))
 torch.set_num_threads(num_cores)
 
@@ -229,55 +229,50 @@ if generate_btn:
     else:
         st.markdown("<h3 style='color: white;'>🔊 Studio Render Output</h3>", unsafe_allow_html=True)
         with st.container(border=True):
-            with st.status("Rendering Audio...", expanded=True) as status:
-                pipeline = load_pipeline()
-                actual_voice = VOICE_MAP.get(voice_display_name, 'bm_fable')
-                
-                # Split sentences to assist fast batch inference
-                sentences = [s.strip() for s in re.split(r'[\n.]+', text_input) if s.strip()]
-                total_sentences = max(1, len(sentences))
-                
-                progress_bar = st.progress(0.0, text="Synthesizing audio...")
-                audio_chunks = []
-                
-                with torch.no_grad():
-                    # Batch processing sentences for maximum speed
-                    for i, sentence in enumerate(sentences):
-                        generator = pipeline(sentence, voice=actual_voice, speed=speed)
-                        for _, _, audio in generator:
-                            audio_chunks.append(audio)
-                        
-                        # Smooth UI progress updates without freezing execution
-                        pct = min(0.95, (i + 1) / total_sentences)
-                        progress_bar.progress(pct, text=f"Processing segment {i+1}/{total_sentences}...")
+            pipeline = load_pipeline()
+            actual_voice = VOICE_MAP.get(voice_display_name, 'bm_fable')
+            
+            # Split sentences for fast batch inference
+            sentences = [s.strip() for s in re.split(r'[\n.]+', text_input) if s.strip()]
+            total_sentences = max(1, len(sentences))
+            
+            progress_bar = st.progress(0.0, text="Synthesizing audio...")
+            audio_chunks = []
+            
+            with torch.no_grad():
+                for i, sentence in enumerate(sentences):
+                    generator = pipeline(sentence, voice=actual_voice, speed=speed)
+                    for _, _, audio in generator:
+                        audio_chunks.append(audio)
+                    
+                    pct = min(0.95, (i + 1) / total_sentences)
+                    progress_bar.progress(pct, text=f"Processing segment {i+1}/{total_sentences}...")
 
-                if audio_chunks:
-                    progress_bar.progress(0.98, text="Merging audio channels...")
-                    full_audio = np.concatenate(audio_chunks)
-                    
-                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-                    sf.write(temp_file.name, full_audio, 24000)
-                    
-                    progress_bar.progress(1.0, text="Complete!")
-                    
-                    # Memory cleanup
-                    del audio_chunks, full_audio
-                    gc.collect()
+            if audio_chunks:
+                progress_bar.progress(0.98, text="Merging audio channels...")
+                full_audio = np.concatenate(audio_chunks)
+                
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+                sf.write(temp_file.name, full_audio, 24000)
+                
+                progress_bar.progress(1.0, text="Complete!")
+                
+                # Cleanup
+                del audio_chunks, full_audio
+                gc.collect()
 
-                    status.update(label="✨ Audio rendering complete!", state="complete", expanded=False)
-                    
-                    col_audio, col_dl = st.columns([3, 1])
-                    with col_audio:
-                        st.audio(temp_file.name, format="audio/wav")
-                    with col_dl:
-                        with open(temp_file.name, "rb") as file:
-                            st.download_button(
-                                label="📥 Download WAV",
-                                data=file,
-                                file_name="lencho_voice.wav",
-                                mime="audio/wav",
-                                use_container_width=True
-                            )
-                else:
-                    progress_bar.empty()
-                    status.update(label="⚠️ Speech generation failed.", state="error")
+                col_audio, col_dl = st.columns([3, 1])
+                with col_audio:
+                    st.audio(temp_file.name, format="audio/wav")
+                with col_dl:
+                    with open(temp_file.name, "rb") as file:
+                        st.download_button(
+                            label="📥 Download WAV",
+                            data=file,
+                            file_name="lencho_voice.wav",
+                            mime="audio/wav",
+                            use_container_width=True
+                        )
+            else:
+                progress_bar.empty()
+                st.error("Speech generation failed.")
