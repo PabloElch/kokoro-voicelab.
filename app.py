@@ -138,27 +138,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Multi-Source Resilient Asset Loader
+# 3. Direct Stable v1.0 Asset Loader
 @st.cache_resource(show_spinner=False)
 def load_onnx_kokoro():
-    sources = [
-        ("onnx-community/Kokoro-82M-ONNX", "model.onnx", "voices.bin"),
-        ("onnx-community/Kokoro-82M-ONNX", "onnx/model.onnx", "voices.bin"),
-        ("onnx-community/Kokoro-82M-v1.0-ONNX", "kokoro-v1.0.onnx", "voices-v1.0.bin"),
-        ("hexgrad/Kokoro-82M", "kokoro-v0_19.onnx", "voices.json"),
-    ]
-    
-    last_exception = None
-    for repo_id, model_file, voices_file in sources:
-        try:
-            m_path = hf_hub_download(repo_id=repo_id, filename=model_file)
-            v_path = hf_hub_download(repo_id=repo_id, filename=voices_file)
-            return Kokoro(m_path, v_path)
-        except Exception as e:
-            last_exception = e
-            continue
-            
-    raise RuntimeError(f"All download fallback sources failed. Last error: {last_exception}")
+    try:
+        m_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-v1.0-ONNX", filename="kokoro-v1.0.onnx")
+        v_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-v1.0-ONNX", filename="voices-v1.0.bin")
+        return Kokoro(m_path, v_path)
+    except Exception as e:
+        raise RuntimeError(f"Failed to download Kokoro v1.0 ONNX model from Hugging Face: {e}")
 
 VOICE_MAP = {
     "🇺🇸 Hinsene (American Female - Warm)": "af_heart",
