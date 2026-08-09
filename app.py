@@ -139,71 +139,42 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Multi-Source Asset Loader
+# 3. Bulletproof HuggingFace Asset Loader
 @st.cache_resource(show_spinner=False)
 def load_onnx_kokoro():
-    # 1. Load ONNX Model
-    model_file = None
+    # Load ONNX model weights
     try:
-        model_file = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/model.onnx")
+        model_path = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/model.onnx")
     except Exception:
-        pass
+        model_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="kokoro-v0_19.onnx")
 
-    if not model_file or not os.path.exists(model_file):
-        model_file = "model.onnx"
-        if not os.path.exists(model_file):
-            urls = [
-                "https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/onnx/model.onnx",
-                "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/kokoro-v0_19.onnx"
-            ]
-            headers = {"User-Agent": "Mozilla/5.0"}
-            for url in urls:
-                try:
-                    req = urllib.request.Request(url, headers=headers)
-                    with urllib.request.urlopen(req, timeout=60) as resp, open(model_file, 'wb') as f:
-                        f.write(resp.read())
-                    if os.path.exists(model_file) and os.path.getsize(model_file) > 0:
-                        break
-                except Exception:
-                    continue
-
-    # 2. Load Voices Metadata (voices.bin / voices.json)
-    voices_file = None
-    hf_voice_targets = [
+    # Load voices embeddings file (voices.bin is natively supported by kokoro-onnx)
+    voices_path = None
+    voice_sources = [
         ("hexgrad/Kokoro-82M", "voices.bin"),
         ("hexgrad/Kokoro-82M", "voices.json"),
+        ("onnx-community/Kokoro-82M-ONNX", "voices.bin"),
     ]
 
-    for repo, filename in hf_voice_targets:
+    for repo, filename in voice_sources:
         try:
-            voices_file = hf_hub_download(repo_id=repo, filename=filename)
-            if voices_file and os.path.exists(voices_file) and os.path.getsize(voices_file) > 0:
+            downloaded = hf_hub_download(repo_id=repo, filename=filename)
+            if os.path.exists(downloaded) and os.path.getsize(downloaded) > 1000:
+                voices_path = downloaded
                 break
         except Exception:
-            voices_file = None
+            continue
 
-    if not voices_file or not os.path.exists(voices_file):
-        voice_urls = [
-            ("voices.json", "https://raw.githubusercontent.com/theowoll/kokoro-onnx/master/voices.json"),
-            ("voices.bin", "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices.bin"),
-            ("voices.json", "https://raw.githubusercontent.com/theowoll/kokoro-onnx/main/voices.json"),
-        ]
-        headers = {"User-Agent": "Mozilla/5.0"}
-        for local_name, url in voice_urls:
-            try:
-                req = urllib.request.Request(url, headers=headers)
-                with urllib.request.urlopen(req, timeout=30) as resp, open(local_name, 'wb') as f:
-                    f.write(resp.read())
-                if os.path.exists(local_name) and os.path.getsize(local_name) > 0:
-                    voices_file = local_name
-                    break
-            except Exception:
-                continue
+    if not voices_path:
+        # Emergency HTTP direct download from HuggingFace CDN
+        voices_path = "voices.bin"
+        if not os.path.exists(voices_path):
+            url = "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices.bin"
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=60) as resp, open(voices_path, "wb") as f:
+                f.write(resp.read())
 
-    if not voices_file or not os.path.exists(voices_file):
-        raise RuntimeError("Failed to fetch voices metadata from all available endpoints.")
-
-    return Kokoro(model_file, voices_file)
+    return Kokoro(model_path, voices_path)
 
 VOICE_MAP = {
     "🇺🇸 Hinsene (American Female - Warm)": "af_heart",
