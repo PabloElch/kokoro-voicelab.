@@ -1,8 +1,9 @@
+import os
 import tempfile
+import urllib.request
+import numpy as np
 import soundfile as sf
 import streamlit as st
-import numpy as np
-from huggingface_hub import hf_hub_download
 from kokoro_onnx import Kokoro
 
 # 1. Page Configuration
@@ -137,16 +138,22 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Replace lines 140-146 in app.py with this:
+# 3. Robust Cached ONNX Loader
 @st.cache_resource(show_spinner=False)
 def load_onnx_kokoro():
-    # Automatically downloads model.onnx and voices.bin/voices.json from the correct ONNX repo
-    return Kokoro.from_pretrained()
-    voices_path = hf_hub_download(
-        repo_id="hexgrad/Kokoro-82M", 
-        filename="voices.json"
-    )
+    model_path = "kokoro-v0_19.onnx"
+    voices_path = "voices.json"
+
+    if not os.path.exists(model_path):
+        url_model = "https://github.com/theowoll/kokoro-onnx/releases/download/v0.19/kokoro-v0_19.onnx"
+        urllib.request.urlretrieve(url_model, model_path)
+
+    if not os.path.exists(voices_path):
+        url_voices = "https://github.com/theowoll/kokoro-onnx/releases/download/v0.19/voices.json"
+        urllib.request.urlretrieve(url_voices, voices_path)
+
     return Kokoro(model_path, voices_path)
+
 VOICE_MAP = {
     "🇺🇸 Hinsene (American Female - Warm)": "af_heart",
     "🇺🇸 Barashe (American Female - Soft)": "af_bella",
