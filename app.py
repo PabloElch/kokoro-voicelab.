@@ -15,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ⚡ CPU Performance Optimization
+# CPU Performance Tuning
 num_cores = max(1, min(4, os.cpu_count() or 2))
 torch.set_num_threads(num_cores)
 
@@ -143,10 +143,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Model Loader
-@st.cache_resource(max_entries=1)
-def load_pipeline():
-    return KPipeline(lang_code='a')
+# 3. Dynamic Pipeline Cache by Language Code
+@st.cache_resource(max_entries=2)
+def load_pipeline(lang_code: str):
+    return KPipeline(lang_code=lang_code)
 
 VOICE_MAP = {
     "🇺🇸 Hinsene (American Female - Warm)": "af_heart",
@@ -162,7 +162,7 @@ VOICE_MAP = {
     "🇬🇧 Lencho (British Male - Narration)": "bm_fable"
 }
 
-# 4. White Sidebar Controls
+# 4. Sidebar Controls
 with st.sidebar:
     st.title("⚙️ Studio Settings")
     st.markdown("Customize your voice engine parameters.")
@@ -184,17 +184,17 @@ with st.sidebar:
     )
 
     st.divider()
-    st.caption("💡 **Tip:** Splitting text into clear paragraphs increases generation speed.")
+    st.caption("💡 **Tip:** American voices use 'a' accent engine, British voices use 'b' accent engine.")
 
 # 5. Hero Header
 st.markdown("""
 <div class="hero-container">
     <div class="hero-title">🎧 <span class="lencho-highlight">LENCHOS</span> VOICE LAB</div>
-    <div class="hero-subtitle">Studio-Grade Text-to-Speech Engine Created By <b>Lencho</b> Lemessa</div>
+    <div class="hero-subtitle">Studio-Grade Text-to-Speech Engine Created by <span class="lencho-highlight">Lencho</span>Lemessa</div>
 </div>
 """, unsafe_allow_html=True)
 
-# Main White Card Studio Input
+# Studio Card Input
 with st.container(border=True):
     st.subheader("📝 Script Editor")
     text_input = st.text_area(
@@ -204,7 +204,6 @@ with st.container(border=True):
         label_visibility="collapsed"
     )
 
-    # Real-time Analytics Bar
     char_count = len(text_input)
     word_count = len(text_input.split()) if text_input else 0
     est_sec = round(word_count / (2.5 * speed)) if word_count > 0 else 0
@@ -227,19 +226,25 @@ if generate_btn:
     else:
         st.markdown("<h3 style='color: white;'>🔊 Studio Render Output</h3>", unsafe_allow_html=True)
         with st.container(border=True):
+            progress_bar = st.progress(0.0, text="Initializing TTS Pipeline...")
             try:
-                progress_bar = st.progress(0.0, text="Initializing TTS Pipeline...")
-                pipeline = load_pipeline()
                 actual_voice = VOICE_MAP.get(voice_display_name, 'bm_fable')
                 
+                # Automatically extract 'a' or 'b' based on selected voice
+                lang_code = actual_voice[0] if actual_voice else 'a'
+                
+                progress_bar.progress(0.1, text=f"Loading pipeline for language '{lang_code}'...")
+                pipeline = load_pipeline(lang_code)
+                
                 audio_chunks = []
-                progress_bar.progress(0.2, text="Synthesizing speech...")
+                progress_bar.progress(0.3, text="Synthesizing speech...")
                 
                 with torch.no_grad():
                     generator = pipeline(text_input, voice=actual_voice, speed=speed)
                     for idx, (_, _, audio) in enumerate(generator):
-                        audio_chunks.append(audio)
-                        pct = min(0.90, 0.2 + (idx + 1) * 0.1)
+                        if audio is not None:
+                            audio_chunks.append(audio)
+                        pct = min(0.90, 0.3 + (idx + 1) * 0.1)
                         progress_bar.progress(pct, text=f"Rendering audio segment {idx + 1}...")
 
                 if audio_chunks:
@@ -251,7 +256,6 @@ if generate_btn:
                     
                     progress_bar.progress(1.0, text="Complete!")
                     
-                    # Cleanup
                     del audio_chunks, full_audio
                     gc.collect()
 
@@ -269,7 +273,9 @@ if generate_btn:
                             )
                 else:
                     progress_bar.empty()
-                    st.error("No audio was generated. Please check your text input.")
+                    st.error("No audio generated. Please verify text input.")
 
-            except Exception as err:
-                st.error(f"An error occurred during generation: {str(err)}")
+            except Exception as e:
+                progress_bar.empty()
+                st.error("⚠️ An internal error occurred during synthesis:")
+                st.exception(e)
