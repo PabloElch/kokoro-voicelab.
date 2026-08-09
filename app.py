@@ -17,45 +17,105 @@ st.set_page_config(
 # Restrict PyTorch CPU threads to stop memory/CPU spikes
 torch.set_num_threads(1)
 
-# 2. Modern UI CSS Styling
+# 2. Animated Gemini Neon Gradient & Glassmorphism Styling
 st.markdown("""
 <style>
-    /* Sleek container styling */
-    .hero-box {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        padding: 1.8rem;
-        border-radius: 14px;
-        border: 1px solid #334155;
-        margin-bottom: 1.5rem;
+    /* Full App Animated Gemini Neon Background */
+    .stApp {
+        background: linear-gradient(-45deg, #0f172a, #1e1b4b, #311042, #0284c7, #4f46e5);
+        background-size: 400% 400%;
+        animation: geminiGradient 14s ease infinite;
     }
+
+    @keyframes geminiGradient {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
+    /* Make Streamlit top header transparent */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+    }
+
+    /* Sidebar Glassmorphism */
+    section[data-testid="stSidebar"] {
+        background: rgba(15, 23, 42, 0.65) !important;
+        backdrop-filter: blur(12px);
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Hero Banner with Glowing LENCHO Highlight */
+    .hero-container {
+        text-align: center;
+        padding: 2.2rem 1.5rem;
+        background: rgba(15, 23, 42, 0.55);
+        backdrop-filter: blur(16px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        margin-bottom: 2rem;
+    }
+
     .hero-title {
-        font-size: 2.2rem;
-        font-weight: 800;
+        font-size: 2.8rem;
+        font-weight: 900;
         color: #ffffff;
         margin: 0;
+        letter-spacing: 1px;
     }
+
+    /* Glowing Animated Gradient text specifically for LENCHO */
+    .lencho-highlight {
+        background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc, #f472b6, #38bdf8);
+        background-size: 300% 300%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: glowingText 4s linear infinite;
+        font-weight: 900;
+        text-shadow: 0 0 20px rgba(129, 140, 248, 0.6);
+    }
+
+    @keyframes glowingText {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
     .hero-subtitle {
-        color: #94a3b8;
-        font-size: 1rem;
-        margin-top: 0.3rem;
-        margin-bottom: 0;
+        color: #cbd5e1;
+        font-size: 1.1rem;
+        margin-top: 0.5rem;
+        font-weight: 400;
     }
-    /* Primary Action Button Customization */
+
+    /* Studio Input Card Glassmorphism */
+    div[data-testid="stVerticalBlock"] > div[style*="border"] {
+        background: rgba(15, 23, 42, 0.6) !important;
+        backdrop-filter: blur(16px) !important;
+        border-radius: 16px !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+    }
+
+    /* Neon Pulse Button */
     div.stButton > button {
         width: 100%;
-        background: linear-gradient(90deg, #4f46e5 0%, #3b82f6 100%);
-        color: white;
-        font-weight: 600;
-        font-size: 1.05rem;
-        padding: 0.6rem 1rem;
-        border-radius: 10px;
-        border: none;
-        box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
-        transition: all 0.2s ease-in-out;
+        background: linear-gradient(90deg, #6366f1 0%, #a855f7 50%, #ec4899 100%) !important;
+        background-size: 200% 200% !important;
+        color: white !important;
+        font-weight: 700 !important;
+        font-size: 1.1rem !important;
+        padding: 0.75rem 1.5rem !important;
+        border-radius: 12px !important;
+        border: none !important;
+        box-shadow: 0 0 20px rgba(168, 85, 247, 0.4) !important;
+        transition: all 0.3s ease-in-out !important;
     }
+
     div.stButton > button:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 6px 15px rgba(59, 130, 246, 0.4);
+        transform: translateY(-2px) scale(1.01) !important;
+        box-shadow: 0 0 30px rgba(236, 72, 153, 0.7) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -82,7 +142,7 @@ VOICE_MAP = {
 # 4. Sidebar Controls
 with st.sidebar:
     st.title("⚙️ Studio Settings")
-    st.markdown("Customize your voice engine parameters below.")
+    st.markdown("Customize your voice engine parameters.")
     st.divider()
 
     voice_display_name = st.selectbox(
@@ -101,13 +161,13 @@ with st.sidebar:
     )
 
     st.divider()
-    st.caption("💡 **Tip:** Break longer scripts into smaller paragraphs for faster rendering.")
+    st.caption("💡 **Tip:** Keep scripts concise for faster generation.")
 
-# 5. Main Content Panel
+# 5. Neon Hero Header
 st.markdown("""
-<div class="hero-box">
-    <div class="hero-title">🎧 Lencho Voice Lab</div>
-    <div class="hero-subtitle">High-Fidelity AI Text-to-Speech Engine</div>
+<div class="hero-container">
+    <div class="hero-title">🎧 <span class="lencho-highlight">LENCHO</span> VOICE LAB</div>
+    <div class="hero-subtitle">Studio-Grade Text-to-Speech Engine Powered by AI</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -121,19 +181,20 @@ with st.container(border=True):
         label_visibility="collapsed"
     )
 
-    # Real-time Stats Row
+    # Real-time Analytics Bar
     char_count = len(text_input)
     word_count = len(text_input.split()) if text_input else 0
-    
+    est_sec = round(word_count / (2.5 * speed)) if word_count > 0 else 0
+
     col_stat1, col_stat2, col_stat3 = st.columns(3)
     with col_stat1:
-        st.caption(f"**Characters:** {char_count}")
+        st.caption(f"**Characters:** `{char_count}`")
     with col_stat2:
-        st.caption(f"**Words:** {word_count}")
+        st.caption(f"**Words:** `{word_count}`")
     with col_stat3:
-        est_sec = round(word_count / (2.5 * speed)) if word_count > 0 else 0
-        st.caption(f"**Est. Duration:** ~{est_sec}s")
+        st.caption(f"**Est. Duration:** `~{est_sec}s`")
 
+    st.markdown("<br>", unsafe_allow_html=True)
     generate_btn = st.button("✨ Generate Audio", type="primary")
 
 # Output Section
@@ -141,14 +202,14 @@ if generate_btn:
     if not text_input.strip():
         st.warning("Please enter some text in the script editor first.")
     else:
-        st.markdown("### 🔊 Audio Generation Output")
+        st.markdown("### 🔊 Studio Render Output")
         with st.container(border=True):
-            with st.status("Initializing Kokoro TTS...", expanded=True) as status:
+            with st.status("Initializing Kokoro Engine...", expanded=True) as status:
                 st.write("🧠 Loading model pipeline...")
                 pipeline = load_pipeline()
                 actual_voice = VOICE_MAP.get(voice_display_name, 'bm_fable')
                 
-                st.write("🗣️ Generating speech segments...")
+                st.write("🗣️ Synthesizing speech segments...")
                 raw_segments = [s for s in text_input.replace('\n', '.').split('.') if s.strip()]
                 total_estimated = max(1, len(raw_segments))
                 
@@ -167,8 +228,8 @@ if generate_btn:
                         st.write(f"🔊 Rendered segment {index + 1}...")
 
                 if audio_chunks:
-                    st.write("💾 Finalizing WAV file...")
-                    progress_bar.progress(0.98, text="Saving WAV file...")
+                    st.write("💾 Merging tracks and saving WAV...")
+                    progress_bar.progress(0.98, text="Finalizing WAV file...")
                     
                     full_audio = np.concatenate(audio_chunks)
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
