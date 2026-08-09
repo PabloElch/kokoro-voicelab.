@@ -137,13 +137,18 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Cache ONNX Engine
+# Replace lines 140-146 in app.py with this:
 @st.cache_resource(show_spinner=False)
 def load_onnx_kokoro():
-    model_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="kokoro-v0_19.onnx")
-    voices_path = hf_hub_download(repo_id="hexgrad/Kokoro-82M", filename="voices.json")
+    model_path = hf_hub_download(
+        repo_id="onnx-community/Kokoro-82M-ONNX", 
+        filename="onnx/model.onnx"
+    )
+    voices_path = hf_hub_download(
+        repo_id="hexgrad/Kokoro-82M", 
+        filename="voices.json"
+    )
     return Kokoro(model_path, voices_path)
-
 VOICE_MAP = {
     "🇺🇸 Hinsene (American Female - Warm)": "af_heart",
     "🇺🇸 Barashe (American Female - Soft)": "af_bella",
