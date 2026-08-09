@@ -230,7 +230,7 @@ with st.sidebar:
 # 5. Hero Header
 st.markdown("""
 <div class="hero-container">
-    <div class="hero-title">🎧 <span class="lencho-highlight">LENCHOS</span> VOICE LAB</div>
+    <div class="hero-title">🎧 <span class="lencho-highlight">Lencho x Latera</span> Audio Studio</div>
     <div class="hero-subtitle">Studio-Grade Text-to-Speech Engine Created by <span class="lencho-highlight">Lencho</span> Lemessa For <span class="lencho-highlight">Latera</span> Lemessa </div>
 </div>
 """, unsafe_allow_html=True)
