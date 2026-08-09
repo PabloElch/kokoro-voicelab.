@@ -148,6 +148,7 @@ def get_kokoro_engine():
     model_path = "kokoro-v1.0.onnx"
     voices_path = "voices-v1.0.bin"
 
+    # Automatically download model if missing on cloud server
     if not os.path.exists(model_path):
         with st.spinner("Downloading Kokoro ONNX model (first-time boot setup)..."):
             urllib.request.urlretrieve(
@@ -155,6 +156,7 @@ def get_kokoro_engine():
                 model_path
             )
 
+    # Automatically download voices configuration if missing
     if not os.path.exists(voices_path):
         with st.spinner("Downloading voice weights configuration..."):
             urllib.request.urlretrieve(
@@ -163,48 +165,6 @@ def get_kokoro_engine():
             )
 
     return Kokoro(model_path, voices_path)
-
-@st.cache_resource(show_spinner=False)
-def get_background_track():
-    bg_path = "ambient_bed.wav"
-    if not os.path.exists(bg_path):
-        try:
-            # Using a reliable public domain short instrumental/ambient sample bed
-            urllib.request.urlretrieve(
-                "https://github.com/rafaelreis-io/rafaelreis-io/raw/main/ambient.wav",
-                bg_path
-            )
-        except Exception:
-            pass
-    return bg_path
-
-def mix_audio_beds(voice_samples, sample_rate, bg_path, volume=0.15):
-    if not os.path.exists(bg_path):
-        return voice_samples
-    
-    try:
-        bg_samples, bg_sr = sf.read(bg_path)
-        
-        # Convert stereo to mono if needed
-        if len(bg_samples.shape) > 1:
-            bg_samples = np.mean(bg_samples, axis=1)
-        if len(voice_samples.shape) > 1:
-            voice_samples = np.mean(voice_samples, axis=1)
-            
-        # Loop background track if it's shorter than the speech
-        if len(bg_samples) < len(voice_samples):
-            repeats = int(np.ceil(len(voice_samples) / len(bg_samples)))
-            bg_samples = np.tile(bg_samples, repeats)
-            
-        bg_samples = bg_samples[:len(voice_samples)]
-        
-        # Mix voice and scaled background music
-        mixed = voice_samples + (bg_samples * volume)
-        # Normalize/Clip to prevent digital distortion
-        mixed = np.clip(mixed, -1.0, 1.0)
-        return mixed
-    except Exception:
-        return voice_samples
 
 VOICE_MAP = {
     "🇺🇸 Hinsene (American Female - Warm)": "af_heart",
@@ -220,7 +180,7 @@ VOICE_MAP = {
     "🇬🇧 Lencho (British Male - Narration)": "bm_fable"
 }
 
-# 4. Sidebar Controls & Background Mixer Settings
+# 4. Sidebar Controls
 with st.sidebar:
     st.title("⚙️ Studio Settings")
     st.markdown("Customize your voice engine parameters.")
@@ -232,6 +192,7 @@ with st.sidebar:
         index=10
     )
 
+    # Instant Voice Preview Button
     if st.button("▶️ Preview Voice"):
         voice_key = VOICE_MAP.get(voice_display_name, 'bm_fable')
         preview_text = "Hello! This is a quick preview of this voice persona."
@@ -261,18 +222,6 @@ with st.sidebar:
         value=1.0, 
         step=0.1,
         help="Adjust the pace of speech generation."
-    )
-
-    st.divider()
-    st.markdown("### 🎵 Background Music Bed")
-    enable_bg = st.checkbox("Enable Ambient Bed", value=False, help="Mixes a soft cinematic background bed underneath your voiceover.")
-    bg_volume = st.slider(
-        "Music Volume", 
-        min_value=0.05, 
-        max_value=0.40, 
-        value=0.15, 
-        step=0.05,
-        help="Adjust background track loudness relative to speech."
     )
 
     st.divider()
@@ -334,21 +283,16 @@ if generate_btn:
                 )
 
                 if samples is not None and len(samples) > 0:
-                    progress_bar.progress(0.8, text="Mixing audio tracks...")
-                    
-                    # Apply background music mixing if enabled
-                    if enable_bg:
-                        bg_path = get_background_track()
-                        samples = mix_audio_beds(samples, sample_rate, bg_path, volume=bg_volume)
-
                     progress_bar.progress(0.9, text="Formatting WAV file...")
                     
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
                     sf.write(temp_file.name, samples, sample_rate)
                     
+                    # Read audio bytes to store in the session history archive
                     with open(temp_file.name, "rb") as f:
                         audio_bytes = f.read()
 
+                    # Save generation parameters & binary data to session state history
                     history_item = {
                         "text": text_input,
                         "voice": voice_display_name,
@@ -392,6 +336,7 @@ if st.session_state.history:
             snippet = item['text'][:120] + "..." if len(item['text']) > 120 else item['text']
             st.caption(f"**Script:** {snippet}")
             
+            # Recreate temp file view for history audio playback
             hist_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
             hist_temp.write(item['audio_bytes'])
             hist_temp.close()
