@@ -1,5 +1,5 @@
 kokoro>=0.3.4
 soundfile
-numpy
-gradio
+numpy<2.0.0
+streamlit
 torch
