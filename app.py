@@ -188,6 +188,29 @@ with st.sidebar:
         index=10
     )
 
+    # Instant Voice Preview Button
+    if st.button("▶️ Preview Voice"):
+        voice_key = VOICE_MAP.get(voice_display_name, 'bm_fable')
+        preview_text = "Hello! This is a quick preview of this voice persona."
+        
+        with st.spinner("Generating preview..."):
+            try:
+                kokoro_engine = get_kokoro_engine()
+                samples, sample_rate = kokoro_engine.create(
+                    preview_text, 
+                    voice=voice_key, 
+                    speed=1.0, 
+                    lang="en-us"
+                )
+                if samples is not None and len(samples) > 0:
+                    temp_preview = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+                    sf.write(temp_preview.name, samples, sample_rate)
+                    st.audio(temp_preview.name, format="audio/wav", autoplay=True)
+            except Exception as e:
+                st.error("Could not generate preview.")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
     speed = st.slider(
         "⚡ Speed Rate", 
         min_value=0.5, 
