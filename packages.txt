@@ -1,1 +1,5 @@
 espeak-ng
+torch
+torchvision
+transformers
+streamlit
