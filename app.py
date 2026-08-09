@@ -1,5 +1,6 @@
 import os
 import tempfile
+import urllib.request
 import numpy as np
 import soundfile as sf
 import streamlit as st
@@ -137,13 +138,28 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Cached Kokoro Model Initializer
+# 3. Automatic Downloader & Kokoro Engine Initializer
 @st.cache_resource(show_spinner=False)
 def get_kokoro_engine():
-    # Looks for model files in the repository directory.
-    # Make sure you include kokoro-v1.0.onnx and voices-v1.0.bin in your repo!
     model_path = "kokoro-v1.0.onnx"
     voices_path = "voices-v1.0.bin"
+
+    # Automatically download model if missing on cloud server
+    if not os.path.exists(model_path):
+        with st.spinner("Downloading Kokoro ONNX model (first-time boot setup)..."):
+            urllib.request.urlretrieve(
+                "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx",
+                model_path
+            )
+
+    # Automatically download voices configuration if missing
+    if not os.path.exists(voices_path):
+        with st.spinner("Downloading voice weights configuration..."):
+            urllib.request.urlretrieve(
+                "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin",
+                voices_path
+            )
+
     return Kokoro(model_path, voices_path)
 
 VOICE_MAP = {
