@@ -139,56 +139,69 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Resilient Multi-Source Asset Downloader
+# 3. Multi-Source Asset Loader
 @st.cache_resource(show_spinner=False)
 def load_onnx_kokoro():
-    model_path = "kokoro-v0_19.onnx"
-    voices_path = "voices.json"
+    # 1. Load ONNX Model
+    model_file = None
+    try:
+        model_file = hf_hub_download(repo_id="onnx-community/Kokoro-82M-ONNX", filename="onnx/model.onnx")
+    except Exception:
+        pass
 
-    def fetch_resource(dest_path, urls, hf_repo=None, hf_filename=None):
-        if os.path.exists(dest_path) and os.path.getsize(dest_path) > 0:
-            return dest_path
+    if not model_file or not os.path.exists(model_file):
+        model_file = "model.onnx"
+        if not os.path.exists(model_file):
+            urls = [
+                "https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/onnx/model.onnx",
+                "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/kokoro-v0_19.onnx"
+            ]
+            headers = {"User-Agent": "Mozilla/5.0"}
+            for url in urls:
+                try:
+                    req = urllib.request.Request(url, headers=headers)
+                    with urllib.request.urlopen(req, timeout=60) as resp, open(model_file, 'wb') as f:
+                        f.write(resp.read())
+                    if os.path.exists(model_file) and os.path.getsize(model_file) > 0:
+                        break
+                except Exception:
+                    continue
 
-        # Primary: Try official Hugging Face Hub library
-        if hf_repo and hf_filename:
-            try:
-                return hf_hub_download(repo_id=hf_repo, filename=hf_filename)
-            except Exception:
-                pass
+    # 2. Load Voices Metadata (voices.bin / voices.json)
+    voices_file = None
+    hf_voice_targets = [
+        ("hexgrad/Kokoro-82M", "voices.bin"),
+        ("hexgrad/Kokoro-82M", "voices.json"),
+    ]
 
-        # Fallback: Try direct HTTP endpoints with browser headers
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        for url in urls:
+    for repo, filename in hf_voice_targets:
+        try:
+            voices_file = hf_hub_download(repo_id=repo, filename=filename)
+            if voices_file and os.path.exists(voices_file) and os.path.getsize(voices_file) > 0:
+                break
+        except Exception:
+            voices_file = None
+
+    if not voices_file or not os.path.exists(voices_file):
+        voice_urls = [
+            ("voices.json", "https://raw.githubusercontent.com/theowoll/kokoro-onnx/master/voices.json"),
+            ("voices.bin", "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices.bin"),
+            ("voices.json", "https://raw.githubusercontent.com/theowoll/kokoro-onnx/main/voices.json"),
+        ]
+        headers = {"User-Agent": "Mozilla/5.0"}
+        for local_name, url in voice_urls:
             try:
                 req = urllib.request.Request(url, headers=headers)
-                with urllib.request.urlopen(req, timeout=45) as response, open(dest_path, 'wb') as out_file:
-                    out_file.write(response.read())
-                if os.path.exists(dest_path) and os.path.getsize(dest_path) > 0:
-                    return dest_path
+                with urllib.request.urlopen(req, timeout=30) as resp, open(local_name, 'wb') as f:
+                    f.write(resp.read())
+                if os.path.exists(local_name) and os.path.getsize(local_name) > 0:
+                    voices_file = local_name
+                    break
             except Exception:
                 continue
 
-        raise RuntimeError(f"Failed to fetch resource: {dest_path}")
-
-    model_file = fetch_resource(
-        dest_path=model_path,
-        urls=[
-            "https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/onnx/model.onnx",
-            "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/kokoro-v0_19.onnx"
-        ],
-        hf_repo="onnx-community/Kokoro-82M-ONNX",
-        hf_filename="onnx/model.onnx"
-    )
-
-    voices_file = fetch_resource(
-        dest_path=voices_path,
-        urls=[
-            "https://raw.githubusercontent.com/theowoll/kokoro-onnx/main/voices.json",
-            "https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/voices.json"
-        ],
-        hf_repo="onnx-community/Kokoro-82M-ONNX",
-        hf_filename="voices.json"
-    )
+    if not voices_file or not os.path.exists(voices_file):
+        raise RuntimeError("Failed to fetch voices metadata from all available endpoints.")
 
     return Kokoro(model_file, voices_file)
 
