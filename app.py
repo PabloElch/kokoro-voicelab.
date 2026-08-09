@@ -4,6 +4,7 @@ import urllib.request
 import numpy as np
 import soundfile as sf
 import streamlit as st
+from huggingface_hub import hf_hub_download
 from kokoro_onnx import Kokoro
 
 # 1. Page Configuration
@@ -138,21 +139,58 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 3. Robust Cached ONNX Loader
+# 3. Resilient Multi-Source Asset Downloader
 @st.cache_resource(show_spinner=False)
 def load_onnx_kokoro():
     model_path = "kokoro-v0_19.onnx"
     voices_path = "voices.json"
 
-    if not os.path.exists(model_path):
-        url_model = "https://github.com/theowoll/kokoro-onnx/releases/download/v0.19/kokoro-v0_19.onnx"
-        urllib.request.urlretrieve(url_model, model_path)
+    def fetch_resource(dest_path, urls, hf_repo=None, hf_filename=None):
+        if os.path.exists(dest_path) and os.path.getsize(dest_path) > 0:
+            return dest_path
 
-    if not os.path.exists(voices_path):
-        url_voices = "https://github.com/theowoll/kokoro-onnx/releases/download/v0.19/voices.json"
-        urllib.request.urlretrieve(url_voices, voices_path)
+        # Primary: Try official Hugging Face Hub library
+        if hf_repo and hf_filename:
+            try:
+                return hf_hub_download(repo_id=hf_repo, filename=hf_filename)
+            except Exception:
+                pass
 
-    return Kokoro(model_path, voices_path)
+        # Fallback: Try direct HTTP endpoints with browser headers
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        for url in urls:
+            try:
+                req = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(req, timeout=45) as response, open(dest_path, 'wb') as out_file:
+                    out_file.write(response.read())
+                if os.path.exists(dest_path) and os.path.getsize(dest_path) > 0:
+                    return dest_path
+            except Exception:
+                continue
+
+        raise RuntimeError(f"Failed to fetch resource: {dest_path}")
+
+    model_file = fetch_resource(
+        dest_path=model_path,
+        urls=[
+            "https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/onnx/model.onnx",
+            "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/kokoro-v0_19.onnx"
+        ],
+        hf_repo="onnx-community/Kokoro-82M-ONNX",
+        hf_filename="onnx/model.onnx"
+    )
+
+    voices_file = fetch_resource(
+        dest_path=voices_path,
+        urls=[
+            "https://raw.githubusercontent.com/theowoll/kokoro-onnx/main/voices.json",
+            "https://huggingface.co/onnx-community/Kokoro-82M-ONNX/resolve/main/voices.json"
+        ],
+        hf_repo="onnx-community/Kokoro-82M-ONNX",
+        hf_filename="voices.json"
+    )
+
+    return Kokoro(model_file, voices_file)
 
 VOICE_MAP = {
     "🇺🇸 Hinsene (American Female - Warm)": "af_heart",
