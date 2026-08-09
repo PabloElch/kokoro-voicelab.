@@ -1,11 +1,16 @@
-import os
 import tempfile
 import numpy as np
 import soundfile as sf
-import gradio as gr
+import streamlit as st
 from kokoro import KPipeline
 
-pipeline = KPipeline(lang_code='a')
+st.set_page_config(page_title="Lencho Voice Lab", page_icon="🎧")
+
+@st.cache_resource
+def load_pipeline():
+    return KPipeline(lang_code='a')
+
+pipeline = load_pipeline()
 
 VOICE_MAP = {
     "Hinsene (American Female - Warm)": "af_heart",
@@ -21,38 +26,31 @@ VOICE_MAP = {
     "Lencho (British Male - Narration)": "bm_fable"
 }
 
-def generate_speech(text, voice_display_name, speed):
-    if not text.strip():
-        return None, None
-    actual_voice = VOICE_MAP.get(voice_display_name, 'af_heart')
-    generator = pipeline(text, voice=actual_voice, speed=speed)
-    audio_chunks = [audio for _, _, audio in generator]
-    if not audio_chunks:
-        return None, None
-    full_audio = np.concatenate(audio_chunks)
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-    sf.write(temp_file.name, full_audio, 24000)
-    return temp_file.name, temp_file.name
+st.title("🎧 Lencho Voice Lab")
 
-with gr.Blocks(title="Lencho Voice Lab") as demo:
-    gr.Markdown("# 🎧 Lencho Voice Lab")
-    with gr.Row():
-        with gr.Column():
-            text_input = gr.Textbox(label="Input Script", lines=6, placeholder="Type your text here...")
-            voice_select = gr.Dropdown(choices=list(VOICE_MAP.keys()), value="Hinsene (American Female - Warm)", label="Voice Persona")
-            speed_slider = gr.Slider(minimum=0.5, maximum=2.0, value=1.0, step=0.1, label="Speed Rate")
-            generate_btn = gr.Button("✨ Generate Audio", variant="primary")
-        with gr.Column():
-            audio_output = gr.Audio(label="Rendered Speech", type="filepath")
-            download_file = gr.File(label="Download WAV File")
+text_input = st.text_area("Input Script", lines=6, placeholder="Type your text here...")
+voice_display_name = st.selectbox("Voice Persona", options=list(VOICE_MAP.keys()))
+speed = st.slider("Speed Rate", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
 
-    generate_btn.click(
-        fn=generate_speech, 
-        inputs=[text_input, voice_select, speed_slider], 
-        outputs=[audio_output, download_file]
-    )
-
-if __name__ == "__main__":
-    # Render provides an environment variable named PORT
-    port = int(os.environ.get("PORT", 7860))
-    demo.launch(server_name="0.0.0.0", server_port=port)
+if st.button("✨ Generate Audio", type="primary"):
+    if not text_input.strip():
+        st.warning("Please enter some text first.")
+    else:
+        with st.spinner("Generating speech..."):
+            actual_voice = VOICE_MAP.get(voice_display_name, 'af_heart')
+            generator = pipeline(text_input, voice=actual_voice, speed=speed)
+            audio_chunks = [audio for _, _, audio in generator]
+            
+            if audio_chunks:
+                full_audio = np.concatenate(audio_chunks)
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+                sf.write(temp_file.name, full_audio, 24000)
+                
+                st.audio(temp_file.name, format="audio/wav")
+                with open(temp_file.name, "rb") as file:
+                    st.download_button(
+                        label="📥 Download WAV File",
+                        data=file,
+                        file_name="lencho_voice.wav",
+                        mime="audio/wav"
+                    )
