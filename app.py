@@ -115,8 +115,8 @@ st.markdown("""
         box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.1) !important;
     }
 
-    /* Button Styling */
-    div.stButton > button {
+    /* Main Generate Button Styling (Dark Slate) */
+    div.stButton > button[kind="primary"] {
         width: 100%;
         background-color: #0f172a !important;
         color: #ffffff !important;
@@ -129,10 +129,30 @@ st.markdown("""
         transition: all 0.2s ease-in-out !important;
     }
 
-    div.stButton > button:hover {
+    div.stButton > button[kind="primary"]:hover {
         background-color: #334155 !important;
         transform: translateY(-1px) !important;
         box-shadow: 0 6px 12px -2px rgba(15, 23, 42, 0.15) !important;
+    }
+
+    /* Secondary / Preview Button Styling (White with Border) */
+    section[data-testid="stSidebar"] div.stButton > button {
+        width: 100%;
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        font-weight: 600 !important;
+        font-size: 0.95rem !important;
+        padding: 0.6rem 1.2rem !important;
+        border-radius: 12px !important;
+        border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02) !important;
+        transition: all 0.2s ease-in-out !important;
+    }
+
+    section[data-testid="stSidebar"] div.stButton > button:hover {
+        background-color: #f8fafc !important;
+        border-color: #cbd5e1 !important;
+        transform: translateY(-1px) !important;
     }
 </style>
 """, unsafe_allow_html=True)
