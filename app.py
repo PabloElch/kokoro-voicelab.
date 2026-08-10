@@ -18,80 +18,72 @@ st.set_page_config(
 if "history" not in st.session_state:
     st.session_state.history = []
 
-# 2. Modern White-Card UI Styling
+# 2. Custom Clean Medical / Editorial Theme Styling (Matching HTML Template)
 st.markdown("""
 <style>
+    /* Global App Background */
     .stApp {
-        background: linear-gradient(-45deg, #0f172a, #311042, #1e1b4b, #0284c7, #6366f1);
-        background-size: 400% 400%;
-        animation: geminiGradient 16s ease infinite;
+        background-color: #f8fafc !important;
+        color: #0f172a !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
-    @keyframes geminiGradient {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-    }
-
+    /* Header styling */
     header[data-testid="stHeader"] {
         background: transparent !important;
     }
 
+    /* Sidebar Styling */
     section[data-testid="stSidebar"] {
         background-color: #ffffff !important;
         border-right: 1px solid #e2e8f0 !important;
-        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15) !important;
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.05) !important;
     }
 
     section[data-testid="stSidebar"] * {
         color: #0f172a !important;
     }
 
+    /* Hero Container Styling */
     .hero-container {
         text-align: center;
-        padding: 2rem 1.5rem;
+        padding: 2.5rem 1.5rem;
         background: #ffffff;
         border-radius: 20px;
         border: 1px solid #e2e8f0;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         margin-bottom: 2rem;
     }
 
     .hero-title {
-        font-size: 2.5rem;
-        font-weight: 900;
+        font-size: 2.25rem;
+        font-weight: 800;
         color: #0f172a;
         margin: 0;
-        letter-spacing: 1px;
+        letter-spacing: -0.025em;
     }
 
     .lencho-highlight {
-        background: linear-gradient(90deg, #2563eb, #7c3aed, #db2777, #2563eb);
-        background-size: 300% 300%;
+        color: #0f172a;
+        font-weight: 900;
+        background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        animation: glowingText 4s linear infinite;
-        font-weight: 900;
-    }
-
-    @keyframes glowingText {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
     }
 
     .hero-subtitle {
-        color: #475569;
-        font-size: 1.1rem;
+        color: #64748b;
+        font-size: 1.05rem;
         margin-top: 0.5rem;
         font-weight: 500;
     }
 
+    /* Card Containers */
     div[data-testid="stVerticalBlock"] > div[style*="border"] {
         background-color: #ffffff !important;
-        border-radius: 18px !important;
+        border-radius: 16px !important;
         border: 1px solid #e2e8f0 !important;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
         padding: 1.5rem !important;
     }
 
@@ -105,39 +97,42 @@ st.markdown("""
     }
 
     .stCaption, [data-testid="stCaptionContainer"] {
-        color: #334155 !important;
+        color: #64748b !important;
+        font-size: 0.9rem !important;
+    }
+
+    /* Text Area Styling */
+    .stTextArea textarea {
+        color: #0f172a !important;
+        background-color: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 12px !important;
         font-size: 0.95rem !important;
     }
 
-    .stTextArea textarea {
-        color: #0f172a !important;
-        background-color: #f8fafc !important;
-        border: 1.5px solid #cbd5e1 !important;
-        border-radius: 12px !important;
-        font-size: 1rem !important;
-    }
-
     .stTextArea textarea:focus {
-        border-color: #6366f1 !important;
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
+        border-color: #0f172a !important;
+        box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.1) !important;
     }
 
+    /* Button Styling */
     div.stButton > button {
         width: 100%;
-        background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 50%, #ec4899 100%) !important;
+        background-color: #0f172a !important;
         color: #ffffff !important;
-        font-weight: 700 !important;
-        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
         padding: 0.75rem 1.5rem !important;
         border-radius: 12px !important;
         border: none !important;
-        box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4) !important;
-        transition: all 0.3s ease-in-out !important;
+        box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.1) !important;
+        transition: all 0.2s ease-in-out !important;
     }
 
     div.stButton > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(236, 72, 153, 0.6) !important;
+        background-color: #334155 !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 6px 12px -2px rgba(15, 23, 42, 0.15) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -286,7 +281,7 @@ if generate_btn:
     if not text_input.strip():
         st.warning("Please enter some text in the script editor first.")
     else:
-        st.markdown("<h3 style='color: white;'>🔊 Studio Render Output</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #0f172a;'>🔊 Studio Render Output</h3>", unsafe_allow_html=True)
         with st.container(border=True):
             progress_bar = st.progress(0.0, text="Initializing ONNX Engine...")
             try:
@@ -349,7 +344,7 @@ if generate_btn:
 # Session History & Archive Section (Strictly capped at 2 items to prevent memory limits)
 if st.session_state.history:
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("<h3 style='color: white;'>📜 Recent Session Archive (Last 2)</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #0f172a;'>📜 Recent Session Archive (Last 2)</h3>", unsafe_allow_html=True)
     with st.container(border=True):
         for idx, item in enumerate(st.session_state.history):
             item_num = len(st.session_state.history) - idx
