@@ -8,7 +8,7 @@ from kokoro_onnx import Kokoro
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="Lencho x Latera Audio Studio",
+    page_title="Lenchos Audio Studio",
     page_icon="🎙️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -213,17 +213,17 @@ def mix_audio_beds(voice_samples, sample_rate, bg_path, volume=0.15):
         return voice_samples
 
 VOICE_MAP = {
-    "🇺🇸 Hinsene (American Female - Warm)": "af_heart",
-    "🇺🇸 Barashe (American Female - Soft)": "af_bella",
-    "🇺🇸 Likitu (American Female - Clear)": "af_nicole",
+    "🇺🇸 Beza (American Female - Warm)": "af_heart",
+    "🇺🇸 Birikti (American Female - Soft)": "af_bella",
+    "🇺🇸 Demoze (American Female - Clear)": "af_nicole",
     "🇺🇸 Lalise (American Female - News)": "af_sarah",
-    "🇺🇸 Latu (American Female - Casual)": "af_sky",
-    "🇺🇸 Lamessa (American Male - Deep)": "am_adam",
-    "🇺🇸 Latera (American Male - Crisp)": "am_michael",
+    "🇺🇸 Efrata (American Female - Casual)": "af_sky",
+    "🇺🇸 Lencho (American Male - Deep)": "am_adam",
+    "🇺🇸 Dego (American Male - Crisp)": "am_michael",
     "🇬🇧 Bontu (British Female - Professional)": "bf_emma",
-    "🇬🇧 Buze (British Female - Warm)": "bf_isabella",
-    "🇬🇧 Lemi (British Male - Expressive)": "bm_george",
-    "🇬🇧 Lencho (British Male - Narration)": "bm_fable"
+    "🇬🇧 Hawi (British Female - Warm)": "bf_isabella",
+    "🇬🇧 Lalisa (British Male - Expressive)": "bm_george",
+    "🇬🇧 Lemi (British Male - Narration)": "bm_fable"
 }
 
 # 4. Sidebar Controls & Background Mixer Settings
@@ -269,8 +269,8 @@ with st.sidebar:
 # 5. Hero Header
 st.markdown("""
 <div class="hero-container">
-    <div class="hero-title">🎙️ <span class="lencho-highlight">LENCHO X LATERA</span> AUDIO STUDIO</div>
-    <div class="hero-subtitle">Precision AI Voice Synthesis by <span class="lencho-highlight">Lencho</span> & <span class="lencho-highlight">Latera</span> <b>Lemessa</b></div>
+    <div class="hero-title">🎙️ <span class="lencho-highlight">LENCHOS </span> AUDIO STUDIO</div>
+    <div class="hero-subtitle">Why pay for ElevenLabs when the mastermind <span class="lencho-highlight"> <b><i><u>Lencho Lemessa</u></i></b>—  </span>is architecting the future of open-source AI audio?</div>
 </div>
 """, unsafe_allow_html=True)
 
