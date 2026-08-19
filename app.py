@@ -57,6 +57,65 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+
+    /* =========================
+       MAIN APP BACKGROUND
+       ========================= */
+
+    .stApp {
+        background-color: #0b0b0d;
+        color: #f2f2f2;
+    }
+
+    [data-testid="stAppViewContainer"] {
+        background-color: #0b0b0d;
+    }
+
+    [data-testid="stHeader"] {
+        background-color: #0b0b0d;
+    }
+
+    /* =========================
+       SIDEBAR
+       ========================= */
+
+    [data-testid="stSidebar"] {
+        background-color: #08080a;
+    }
+
+    [data-testid="stSidebar"] > div:first-child {
+        background-color: #08080a;
+    }
+
+    /* =========================
+       GENERAL TEXT
+       ========================= */
+
+    body,
+    p,
+    label,
+    span,
+    div {
+        color: #f2f2f2;
+    }
+
+    .stMarkdown,
+    .stCaption {
+        color: #d6d6d6;
+    }
+
+    /* =========================
+       HEADINGS
+       ========================= */
+
+    h1, h2, h3, h4, h5, h6 {
+        color: #ffffff !important;
+    }
+
+    /* =========================
+       HERO
+       ========================= */
+
     .hero-container {
         padding: 28px 10px 20px 10px;
         text-align: center;
@@ -66,24 +125,201 @@ st.markdown(
         font-size: 38px;
         font-weight: 800;
         letter-spacing: 1px;
+        color: #ffffff;
     }
 
     .hero-subtitle {
         font-size: 15px;
         opacity: 0.75;
         margin-top: 8px;
+        color: #d0d0d0;
     }
+
+    /* =========================
+       STATUS BOX
+       ========================= */
 
     .status-box {
         padding: 14px;
         border-radius: 12px;
-        border: 1px solid rgba(128,128,128,.25);
+        border: 1px solid #29292d;
+        background-color: #111114;
         margin-top: 10px;
+        color: #f2f2f2;
     }
+
+    /* =========================
+       TEXT AREA
+       ========================= */
+
+    textarea {
+        background-color: #111114 !important;
+        color: #f5f5f5 !important;
+        border: 1px solid #303036 !important;
+    }
+
+    textarea::placeholder {
+        color: #88888f !important;
+    }
+
+    /* =========================
+       INPUTS / SELECTBOXES
+       ========================= */
+
+    input {
+        background-color: #111114 !important;
+        color: #f5f5f5 !important;
+    }
+
+    [data-baseweb="select"] > div {
+        background-color: #111114 !important;
+        color: #f5f5f5 !important;
+        border-color: #303036 !important;
+    }
+
+    [data-baseweb="popover"] {
+        background-color: #111114 !important;
+    }
+
+    [role="option"] {
+        background-color: #111114 !important;
+        color: #f5f5f5 !important;
+    }
+
+    [role="option"]:hover {
+        background-color: #222226 !important;
+    }
+
+    /* =========================
+       METRIC BOXES
+       ========================= */
+
+    [data-testid="stMetric"] {
+        background-color: #111114;
+        border: 1px solid #29292d;
+        border-radius: 12px;
+        padding: 12px;
+    }
+
+    [data-testid="stMetricLabel"] {
+        color: #aaaaaf !important;
+    }
+
+    [data-testid="stMetricValue"] {
+        color: #ffffff !important;
+    }
+
+    /* =========================
+       EXPANDERS
+       ========================= */
+
+    [data-testid="stExpander"] {
+        background-color: #111114;
+        border: 1px solid #29292d;
+        border-radius: 12px;
+    }
+
+    /* =========================
+       PROGRESS BAR
+       ========================= */
+
+    [data-testid="stProgress"] {
+        background-color: #050505 !important;
+    }
+
+    [data-testid="stProgress"] > div {
+        background-color: #050505 !important;
+        border-radius: 10px;
+    }
+
+    [data-testid="stProgress"] div[role="progressbar"] {
+        background-color: #050505 !important;
+        border-radius: 10px;
+    }
+
+    [data-testid="stProgress"] div[role="progressbar"] > div {
+        background-color: #777777 !important;
+        border-radius: 10px;
+    }
+
+    /* =========================
+       BUTTONS
+       ========================= */
+
+    .stButton > button {
+        background-color: #18181c;
+        color: #ffffff;
+        border: 1px solid #35353b;
+    }
+
+    .stButton > button:hover {
+        background-color: #24242a;
+        color: #ffffff;
+        border-color: #55555d;
+    }
+
+    /* =========================
+       DIVIDERS
+       ========================= */
+
+    hr {
+        border-color: #29292d !important;
+    }
+
+    /* =========================
+       AUDIO PLAYER
+       ========================= */
+
+    audio {
+        background-color: #111114;
+    }
+
+    /* =========================
+       CODE / PREVIEW AREAS
+       ========================= */
+
+    pre,
+    code {
+        background-color: #111114 !important;
+        color: #eeeeee !important;
+    }
+
+    /* =========================
+       ALERTS / INFO BOXES
+       ========================= */
+
+    [data-testid="stAlert"] {
+        background-color: #111114;
+        color: #eeeeee;
+    }
+
+    /* =========================
+       SCROLLBAR
+       ========================= */
+
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: #08080a;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: #303036;
+        border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: #44444c;
+    }
+
     </style>
     """,
     unsafe_allow_html=True,
 )
+
 
 
 # ============================================================
