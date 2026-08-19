@@ -1,216 +1,931 @@
+import gc
+import hashlib
 import os
+import re
+import shutil
+import subprocess
 import tempfile
 import urllib.request
+from pathlib import Path
+
 import numpy as np
 import soundfile as sf
 import streamlit as st
 from kokoro_onnx import Kokoro
 
-# 1. Page Configuration
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
+
+APP_NAME = "Lenchos Audio Studio"
+
+TARGET_WORDS_PER_CHUNK = 550
+
+OUTPUT_SAMPLE_RATE = 24000
+
+MODEL_URL = (
+    "https://github.com/thewh1teagle/kokoro-onnx/releases/download/"
+    "model-files-v1.0/kokoro-v1.0.onnx"
+)
+
+VOICES_URL = (
+    "https://github.com/thewh1teagle/kokoro-onnx/releases/download/"
+    "model-files-v1.0/voices-v1.0.bin"
+)
+
+MODEL_FILENAME = "kokoro-v1.0.onnx"
+VOICES_FILENAME = "voices-v1.0.bin"
+
+
+# ============================================================
+# PAGE CONFIG
+# ============================================================
+
 st.set_page_config(
     page_title="Lenchos Audio Studio",
     page_icon="🎙️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# Initialize Session State with a strict history limit to save RAM (capped at 2 items)
-if "history" not in st.session_state:
-    st.session_state.history = []
 
-# 2. Custom Clean Medical / Editorial Theme Styling (Matching HTML Template)
-st.markdown("""
-<style>
-    /* Global App Background */
-    .stApp {
-        background-color: #f8fafc !important;
-        color: #0f172a !important;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
+# ============================================================
+# CSS
+# ============================================================
 
-    /* Header styling */
-    header[data-testid="stHeader"] {
-        background: transparent !important;
-    }
-
-    /* Sidebar Styling */
-    section[data-testid="stSidebar"] {
-        background-color: #ffffff !important;
-        border-right: 1px solid #e2e8f0 !important;
-        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.05) !important;
-    }
-
-    section[data-testid="stSidebar"] * {
-        color: #0f172a !important;
-    }
-
-    /* Hero Container Styling */
+st.markdown(
+    """
+    <style>
     .hero-container {
+        padding: 28px 10px 20px 10px;
         text-align: center;
-        padding: 2.5rem 1.5rem;
-        background: #ffffff;
-        border-radius: 20px;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-        margin-bottom: 2rem;
     }
 
     .hero-title {
-        font-size: 2.25rem;
+        font-size: 38px;
         font-weight: 800;
-        color: #0f172a;
-        margin: 0;
-        letter-spacing: -0.025em;
-    }
-
-    .lencho-highlight {
-        color: #0f172a;
-        font-weight: 900;
-        background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        letter-spacing: 1px;
     }
 
     .hero-subtitle {
-        color: #64748b;
-        font-size: 1.05rem;
-        margin-top: 0.5rem;
-        font-weight: 500;
+        font-size: 15px;
+        opacity: 0.75;
+        margin-top: 8px;
     }
 
-    /* Card Containers */
-    div[data-testid="stVerticalBlock"] > div[style*="border"] {
-        background-color: #ffffff !important;
-        border-radius: 16px !important;
-        border: 1px solid #e2e8f0 !important;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
-        padding: 1.5rem !important;
+    .status-box {
+        padding: 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(128,128,128,.25);
+        margin-top: 10px;
     }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-    div[data-testid="stVerticalBlock"] > div[style*="border"] h1,
-    div[data-testid="stVerticalBlock"] > div[style*="border"] h2,
-    div[data-testid="stVerticalBlock"] > div[style*="border"] h3,
-    div[data-testid="stVerticalBlock"] > div[style*="border"] p,
-    div[data-testid="stVerticalBlock"] > div[style*="border"] span,
-    div[data-testid="stVerticalBlock"] > div[style*="border"] label {
-        color: #0f172a !important;
-    }
 
-    .stCaption, [data-testid="stCaptionContainer"] {
-        color: #64748b !important;
-        font-size: 0.9rem !important;
-    }
+# ============================================================
+# HERO
+# ============================================================
 
-    /* Text Area Styling */
-    .stTextArea textarea {
-        color: #0f172a !important;
-        background-color: #ffffff !important;
-        border: 1px solid #e2e8f0 !important;
-        border-radius: 12px !important;
-        font-size: 0.95rem !important;
-    }
+st.markdown(
+    """
+    <div class="hero-container">
+        <div class="hero-title">
+            🎙️ LENCHOS AUDIO STUDIO
+        </div>
+        <div class="hero-subtitle">
+            Open-source AI narration for calm, long-form audio.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
-    .stTextArea textarea:focus {
-        border-color: #0f172a !important;
-        box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.1) !important;
-    }
 
-    /* Main Generate Button Styling (Dark Slate) */
-    div.stButton > button[kind="primary"] {
-        width: 100%;
-        background-color: #0f172a !important;
-        color: #ffffff !important;
-        font-weight: 600 !important;
-        font-size: 1rem !important;
-        padding: 0.75rem 1.5rem !important;
-        border-radius: 12px !important;
-        border: none !important;
-        box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.1) !important;
-        transition: all 0.2s ease-in-out !important;
-    }
+# ============================================================
+# SESSION STATE
+# ============================================================
 
-    div.stButton > button[kind="primary"]:hover {
-        background-color: #334155 !important;
-        transform: translateY(-1px) !important;
-        box-shadow: 0 6px 12px -2px rgba(15, 23, 42, 0.15) !important;
-    }
+if "current_job" not in st.session_state:
+    st.session_state.current_job = None
 
-    /* Secondary / Preview Button Styling (White with Border) */
-    section[data-testid="stSidebar"] div.stButton > button {
-        width: 100%;
-        background-color: #ffffff !important;
-        color: #0f172a !important;
-        font-weight: 600 !important;
-        font-size: 0.95rem !important;
-        padding: 0.6rem 1.2rem !important;
-        border-radius: 12px !important;
-        border: 1px solid #e2e8f0 !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02) !important;
-        transition: all 0.2s ease-in-out !important;
-    }
+if "history" not in st.session_state:
+    st.session_state.history = []
 
-    section[data-testid="stSidebar"] div.stButton > button:hover {
-        background-color: #f8fafc !important;
-        border-color: #cbd5e1 !important;
-        transform: translateY(-1px) !important;
-    }
-</style>
-""", unsafe_allow_html=True)
 
-# 3. Automatic Downloader & Kokoro Engine Initializer
-@st.cache_resource(show_spinner=False)
-def get_kokoro_engine():
-    model_path = "kokoro-v1.0.onnx"
-    voices_path = "voices-v1.0.bin"
+# ============================================================
+# DIRECTORY HELPERS
+# ============================================================
 
-    if not os.path.exists(model_path):
-        with st.spinner("Downloading Kokoro ONNX model (first-time boot setup)..."):
-            urllib.request.urlretrieve(
-                "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx",
-                model_path
-            )
+def get_base_work_dir():
+    base_dir = (
+        Path(tempfile.gettempdir())
+        / "lenchos_audio_studio"
+    )
 
-    if not os.path.exists(voices_path):
-        with st.spinner("Downloading voice weights configuration..."):
-            urllib.request.urlretrieve(
-                "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin",
-                voices_path
-            )
+    base_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
-    return Kokoro(model_path, voices_path)
+    return base_dir
 
-@st.cache_resource(show_spinner=False)
-def get_background_track():
-    bg_path = "ambient_bed.wav"
-    if not os.path.exists(bg_path):
+
+def cleanup_old_jobs(keep_job_dirs=None):
+    if keep_job_dirs is None:
+        keep_job_dirs = set()
+
+    base_dir = get_base_work_dir()
+
+    for item in base_dir.iterdir():
+
+        if not item.is_dir():
+            continue
+
+        if item.name in {"model"}:
+            continue
+
+        if str(item) in keep_job_dirs:
+            continue
+
         try:
-            urllib.request.urlretrieve(
-                "https://github.com/rafaelreis-io/rafaelreis-io/raw/main/ambient.wav",
-                bg_path
-            )
+            shutil.rmtree(item)
         except Exception:
             pass
-    return bg_path
 
-def mix_audio_beds(voice_samples, sample_rate, bg_path, volume=0.15):
-    if not os.path.exists(bg_path):
-        return voice_samples
+
+# ============================================================
+# FILE DOWNLOAD
+# ============================================================
+
+def download_file(url, destination):
+    destination = Path(destination)
+
+    if (
+        destination.exists()
+        and destination.stat().st_size > 0
+    ):
+        return str(destination)
+
+    destination.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    urllib.request.urlretrieve(
+        url,
+        destination,
+    )
+
+    return str(destination)
+
+
+# ============================================================
+# KOKORO ENGINE
+# ============================================================
+
+@st.cache_resource(
+    show_spinner="Loading Kokoro model..."
+)
+def get_kokoro_engine():
+
+    model_dir = (
+        get_base_work_dir()
+        / "model"
+    )
+
+    model_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    model_path = (
+        model_dir
+        / MODEL_FILENAME
+    )
+
+    voices_path = (
+        model_dir
+        / VOICES_FILENAME
+    )
+
+    download_file(
+        MODEL_URL,
+        model_path,
+    )
+
+    download_file(
+        VOICES_URL,
+        voices_path,
+    )
+
+    kokoro = Kokoro(
+        str(model_path),
+        str(voices_path),
+    )
+
+    return kokoro
+
+
+# ============================================================
+# TEXT PROCESSING
+# ============================================================
+
+def normalize_script(text):
+    text = text.replace("\r\n", "\n")
+    text = text.replace("\r", "\n")
+
+    lines = []
+
+    for line in text.split("\n"):
+
+        cleaned = re.sub(
+            r"\s+",
+            " ",
+            line.strip(),
+        )
+
+        if cleaned:
+            lines.append(cleaned)
+
+    return "\n\n".join(lines)
+
+
+def split_long_sentence(
+    sentence,
+    target_words,
+):
+    words = sentence.split()
+
+    if len(words) <= target_words:
+        return [sentence.strip()]
+
+    pieces = []
+
+    for start in range(
+        0,
+        len(words),
+        target_words,
+    ):
+
+        piece = " ".join(
+            words[
+                start:start + target_words
+            ]
+        )
+
+        if piece.strip():
+            pieces.append(
+                piece.strip()
+            )
+
+    return pieces
+
+
+def split_script_into_chunks(
+    text,
+    target_words=TARGET_WORDS_PER_CHUNK,
+):
+
+    text = normalize_script(text)
+
+    if not text:
+        return []
+
+    paragraphs = re.split(
+        r"\n\s*\n",
+        text,
+    )
+
+    sentences = []
+
+    for paragraph in paragraphs:
+
+        paragraph = paragraph.strip()
+
+        if not paragraph:
+            continue
+
+        paragraph_sentences = re.split(
+            r"(?<=[.!?])\s+",
+            paragraph,
+        )
+
+        for sentence in paragraph_sentences:
+
+            sentence = sentence.strip()
+
+            if not sentence:
+                continue
+
+            sentences.extend(
+                split_long_sentence(
+                    sentence,
+                    target_words,
+                )
+            )
+
+    chunks = []
+
+    current = []
+    current_words = 0
+
+    for sentence in sentences:
+
+        sentence_words = len(
+            sentence.split()
+        )
+
+        if (
+            current
+            and current_words + sentence_words
+            > target_words
+        ):
+
+            chunks.append(
+                " ".join(current).strip()
+            )
+
+            current = []
+            current_words = 0
+
+        current.append(sentence)
+        current_words += sentence_words
+
+    if current:
+
+        chunks.append(
+            " ".join(current).strip()
+        )
+
+    return chunks
+
+
+# ============================================================
+# JOB ID
+# ============================================================
+
+def make_job_id(
+    script,
+    voice,
+    speed,
+):
+
+    payload = (
+        f"{script}|"
+        f"{voice}|"
+        f"{speed:.4f}"
+    )
+
+    digest = hashlib.sha256(
+        payload.encode("utf-8")
+    ).hexdigest()
+
+    return digest[:16]
+
+
+# ============================================================
+# JOB DIRECTORY
+# ============================================================
+
+def create_job_directory(job_id):
+
+    base_dir = get_base_work_dir()
+
+    job_dir = (
+        base_dir
+        / f"job_{job_id}"
+    )
+
+    job_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    chunks_dir = (
+        job_dir / "chunks"
+    )
+
+    chunks_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    return job_dir
+
+
+# ============================================================
+# CHUNK PATH
+# ============================================================
+
+def get_chunk_path(
+    job_dir,
+    index,
+):
+
+    return (
+        Path(job_dir)
+        / "chunks"
+        / f"chunk_{index:03d}.wav"
+    )
+
+
+# ============================================================
+# CHUNK VALIDATION
+# ============================================================
+
+def chunk_is_complete(path):
+
+    path = Path(path)
+
+    if not path.exists():
+        return False
+
+    if path.stat().st_size < 1000:
+        return False
+
     try:
-        bg_samples, _ = sf.read(bg_path)
-        if len(bg_samples.shape) > 1:
-            bg_samples = np.mean(bg_samples, axis=1)
-        if len(voice_samples.shape) > 1:
-            voice_samples = np.mean(voice_samples, axis=1)
-            
-        if len(bg_samples) < len(voice_samples):
-            repeats = int(np.ceil(len(voice_samples) / len(bg_samples)))
-            bg_samples = np.tile(bg_samples, repeats)
-            
-        bg_samples = bg_samples[:len(voice_samples)]
-        mixed = voice_samples + (bg_samples * volume)
-        return np.clip(mixed, -1.0, 1.0)
+
+        info = sf.info(
+            str(path)
+        )
+
+        return (
+            info.frames > 0
+            and info.samplerate > 0
+        )
+
     except Exception:
-        return voice_samples
+        return False
+
+
+# ============================================================
+# GENERATE ONE CHUNK
+# ============================================================
+
+def generate_chunk(
+    kokoro,
+    text,
+    voice,
+    speed,
+    output_path,
+):
+
+    samples, sample_rate = (
+        kokoro.create(
+            text,
+            voice=voice,
+            speed=float(speed),
+            lang="en-us",
+        )
+    )
+
+    samples = np.asarray(
+        samples,
+        dtype=np.float32,
+    )
+
+    sample_rate = int(
+        sample_rate
+    )
+
+    sf.write(
+        str(output_path),
+        samples,
+        sample_rate,
+        subtype="PCM_16",
+    )
+
+    del samples
+
+    gc.collect()
+
+    return sample_rate
+
+
+# ============================================================
+# COMBINE WAV CHUNKS
+# ============================================================
+
+def combine_wav_files(
+    chunk_paths,
+    output_path,
+):
+
+    if not chunk_paths:
+        raise ValueError(
+            "No audio chunks were found."
+        )
+
+    first_info = sf.info(
+        str(chunk_paths[0])
+    )
+
+    sample_rate = (
+        first_info.samplerate
+    )
+
+    channels = (
+        first_info.channels
+    )
+
+    with sf.SoundFile(
+        str(output_path),
+        mode="w",
+        samplerate=sample_rate,
+        channels=channels,
+        subtype="PCM_16",
+        format="WAV",
+    ) as output_file:
+
+        for path in chunk_paths:
+
+            with sf.SoundFile(
+                str(path),
+                mode="r",
+            ) as input_file:
+
+                if (
+                    input_file.samplerate
+                    != sample_rate
+                ):
+                    raise ValueError(
+                        "Chunk sample rates do not match."
+                    )
+
+                if (
+                    input_file.channels
+                    != channels
+                ):
+                    raise ValueError(
+                        "Chunk channel counts do not match."
+                    )
+
+                while True:
+
+                    block = (
+                        input_file.read(
+                            65536,
+                            dtype="float32",
+                        )
+                    )
+
+                    if len(block) == 0:
+                        break
+
+                    output_file.write(
+                        block
+                    )
+
+                    del block
+
+    gc.collect()
+
+
+# ============================================================
+# MP3 CONVERSION
+# ============================================================
+
+def convert_wav_to_mp3(
+    wav_path,
+    mp3_path,
+):
+
+    try:
+        import imageio_ffmpeg
+
+    except ImportError as exc:
+
+        raise RuntimeError(
+            "imageio-ffmpeg is not installed. "
+            "Add imageio-ffmpeg to requirements.txt."
+        ) from exc
+
+    ffmpeg_exe = (
+        imageio_ffmpeg.get_ffmpeg_exe()
+    )
+
+    command = [
+        ffmpeg_exe,
+        "-y",
+        "-i",
+        str(wav_path),
+        "-codec:a",
+        "libmp3lame",
+        "-b:a",
+        "128k",
+        "-ar",
+        str(OUTPUT_SAMPLE_RATE),
+        str(mp3_path),
+    ]
+
+    result = subprocess.run(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    if result.returncode != 0:
+
+        raise RuntimeError(
+            "FFmpeg MP3 conversion failed:\n\n"
+            + result.stderr[-3000:]
+        )
+
+    if (
+        not mp3_path.exists()
+        or mp3_path.stat().st_size == 0
+    ):
+
+        raise RuntimeError(
+            "MP3 conversion completed but "
+            "the MP3 file was not created."
+        )
+
+
+# ============================================================
+# DELETE ALL WAV FILES
+# ============================================================
+
+def delete_all_wav_files(
+    job_dir,
+):
+
+    job_dir = Path(job_dir)
+
+    final_wav = (
+        job_dir
+        / "final_narration.wav"
+    )
+
+    if final_wav.exists():
+
+        try:
+            final_wav.unlink()
+        except Exception:
+            pass
+
+    chunks_dir = (
+        job_dir / "chunks"
+    )
+
+    if chunks_dir.exists():
+
+        for wav_file in chunks_dir.glob(
+            "*.wav"
+        ):
+
+            try:
+                wav_file.unlink()
+            except Exception:
+                pass
+
+        try:
+
+            if not any(
+                chunks_dir.iterdir()
+            ):
+                chunks_dir.rmdir()
+
+        except Exception:
+            pass
+
+    gc.collect()
+
+
+# ============================================================
+# PREVIEW VOICE AS MP3
+# ============================================================
+
+def generate_preview_mp3(
+    kokoro,
+    voice,
+    speed=1.0,
+):
+
+    preview_text = (
+        "Hello. This is a quick preview "
+        "of this voice persona. "
+        "I hope you enjoy listening."
+    )
+
+    samples, sample_rate = (
+        kokoro.create(
+            preview_text,
+            voice=voice,
+            speed=float(speed),
+            lang="en-us",
+        )
+    )
+
+    samples = np.asarray(
+        samples,
+        dtype=np.float32,
+    )
+
+    sample_rate = int(
+        sample_rate
+    )
+
+    # Convert float audio to signed 16-bit PCM.
+    samples_int16 = np.clip(
+        samples,
+        -1.0,
+        1.0,
+    )
+
+    samples_int16 = (
+        samples_int16 * 32767
+    ).astype(
+        np.int16
+    )
+
+    raw_audio = (
+        samples_int16
+        .tobytes()
+    )
+
+    del samples
+    del samples_int16
+
+    gc.collect()
+
+    try:
+        import imageio_ffmpeg
+
+    except ImportError as exc:
+
+        raise RuntimeError(
+            "imageio-ffmpeg is not installed."
+        ) from exc
+
+    ffmpeg_exe = (
+        imageio_ffmpeg.get_ffmpeg_exe()
+    )
+
+    command = [
+        ffmpeg_exe,
+        "-y",
+        "-f",
+        "s16le",
+        "-ar",
+        str(sample_rate),
+        "-ac",
+        "1",
+        "-i",
+        "pipe:0",
+        "-codec:a",
+        "libmp3lame",
+        "-b:a",
+        "128k",
+        "-ar",
+        str(OUTPUT_SAMPLE_RATE),
+        "-f",
+        "mp3",
+        "pipe:1",
+    ]
+
+    result = subprocess.run(
+        command,
+        input=raw_audio,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    del raw_audio
+
+    gc.collect()
+
+    if result.returncode != 0:
+
+        raise RuntimeError(
+            "Could not create MP3 preview:\n\n"
+            + result.stderr.decode(
+                "utf-8",
+                errors="ignore",
+            )[-3000:]
+        )
+
+    if not result.stdout:
+
+        raise RuntimeError(
+            "MP3 preview was empty."
+        )
+
+    return result.stdout
+
+
+# ============================================================
+# JOB STATUS
+# ============================================================
+
+def count_completed_chunks(
+    job_dir,
+    total_chunks,
+):
+
+    count = 0
+
+    for index in range(
+        1,
+        total_chunks + 1,
+    ):
+
+        path = get_chunk_path(
+            job_dir,
+            index,
+        )
+
+        if chunk_is_complete(path):
+            count += 1
+
+    return count
+
+
+# ============================================================
+# HISTORY
+# ============================================================
+
+def add_history_item(item):
+
+    history = (
+        st.session_state.history
+    )
+
+    history = [
+        old
+        for old in history
+        if old.get("job_id")
+        != item.get("job_id")
+    ]
+
+    history.insert(
+        0,
+        item,
+    )
+
+    st.session_state.history = (
+        history[:2]
+    )
+
+
+def cleanup_history_dirs():
+
+    keep_dirs = set()
+
+    current_job = (
+        st.session_state.current_job
+    )
+
+    if current_job:
+
+        work_dir = current_job.get(
+            "work_dir"
+        )
+
+        if work_dir:
+            keep_dirs.add(
+                str(work_dir)
+            )
+
+    for item in (
+        st.session_state.history
+    ):
+
+        work_dir = item.get(
+            "work_dir"
+        )
+
+        if work_dir:
+            keep_dirs.add(
+                str(work_dir)
+            )
+
+    base_dir = get_base_work_dir()
+
+    for item in base_dir.iterdir():
+
+        if not item.is_dir():
+            continue
+
+        if item.name == "model":
+            continue
+
+        if str(item) not in keep_dirs:
+
+            try:
+                shutil.rmtree(item)
+            except Exception:
+                pass
+
+
+# ============================================================
+# VOICE MAP
+# ============================================================
 
 VOICE_MAP = {
     "🇺🇸 Beza (American Female - Warm)": "af_heart",
@@ -223,170 +938,766 @@ VOICE_MAP = {
     "🇬🇧 Bontu (British Female - Professional)": "bf_emma",
     "🇬🇧 Hawi (British Female - Warm)": "bf_isabella",
     "🇬🇧 Lalisa (British Male - Expressive)": "bm_george",
-    "🇬🇧 Lemi (British Male - Narration)": "bm_fable"
+    "🇬🇧 Lemi (British Male - Narration)": "bm_fable",
 }
 
-# 4. Sidebar Controls & Background Mixer Settings
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+
 with st.sidebar:
-    st.title("⚙️ Studio Settings")
-    st.markdown("Customize your voice engine parameters.")
-    st.divider()
 
-    voice_display_name = st.selectbox(
-        "🎙️ Voice Persona", 
-        options=list(VOICE_MAP.keys()),
-        index=10
+    st.header("🎙️ Voice Settings")
+
+    voice_name = st.selectbox(
+        "Narrator",
+        list(VOICE_MAP.keys()),
+        index=9,
     )
 
-    if st.button("▶️ Preview Voice"):
-        voice_key = VOICE_MAP.get(voice_display_name, 'bm_fable')
-        preview_text = "Hello! This is a quick preview of this voice persona."
-        with st.spinner("Generating preview..."):
+    voice_key = VOICE_MAP[
+        voice_name
+    ]
+
+    speed = st.slider(
+        "Speech speed",
+        min_value=0.5,
+        max_value=2.0,
+        value=1.0,
+        step=0.05,
+    )
+
+    st.caption(
+        "For Slumber Tales English, "
+        "around 0.90–1.00 is a good starting point."
+    )
+
+    st.divider()
+
+    st.subheader("🎧 Voice Preview")
+
+    if st.button(
+        "▶️ Preview Voice",
+        use_container_width=True,
+    ):
+
+        with st.spinner(
+            "Generating MP3 preview..."
+        ):
+
             try:
-                kokoro_engine = get_kokoro_engine()
-                samples, sample_rate = kokoro_engine.create(
-                    preview_text, voice=voice_key, speed=1.0, lang="en-us"
+
+                kokoro = (
+                    get_kokoro_engine()
                 )
-                if samples is not None and len(samples) > 0:
-                    temp_preview = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-                    sf.write(temp_preview.name, samples, sample_rate)
-                    st.audio(temp_preview.name, format="audio/wav", autoplay=True)
-            except Exception:
-                st.error("Could not generate preview.")
 
-    st.markdown("<br>", unsafe_allow_html=True)
+                preview_mp3 = (
+                    generate_preview_mp3(
+                        kokoro,
+                        voice_key,
+                        speed,
+                    )
+                )
 
-    speed = st.slider("⚡ Speed Rate", min_value=0.5, max_value=2.0, value=1.0, step=0.1)
+                st.success(
+                    "Preview ready."
+                )
+
+                st.audio(
+                    preview_mp3,
+                    format="audio/mpeg",
+                )
+
+            except Exception as exc:
+
+                st.error(
+                    "Could not generate voice preview."
+                )
+
+                st.exception(exc)
 
     st.divider()
-    st.markdown("### 🎵 Background Music Bed")
-    enable_bg = st.checkbox("Enable Ambient Bed", value=False)
-    bg_volume = st.slider("Music Volume", min_value=0.05, max_value=0.40, value=0.15, step=0.05)
 
-    st.divider()
-    st.caption("🚀 **Studio Engine:** Active.")
+    st.subheader("⚙️ Chunking")
 
-# 5. Hero Header
-st.markdown("""
-<div class="hero-container">
-    <div class="hero-title">🎙️ <span class="lencho-highlight">LENCHOS </span> AUDIO STUDIO</div>
-    <div class="hero-subtitle">Why pay for ElevenLabs when the mastermind <span class="lencho-highlight"> <b><i><u>Lencho Lemessa</u></i></b> </span>is architecting the future of open-source AI audio?</div>
-</div>
-""", unsafe_allow_html=True)
-
-# Studio Card Input
-with st.container(border=True):
-    st.subheader("📝 Script Editor")
-    text_input = st.text_area(
-        "Input Script", height=180, placeholder="Type or paste your text here...", label_visibility="collapsed"
+    st.write(
+        f"Target chunk size: "
+        f"**{TARGET_WORDS_PER_CHUNK} words**"
     )
 
-    char_count = len(text_input)
-    word_count = len(text_input.split()) if text_input else 0
-    est_sec = round(word_count / (2.5 * speed)) if word_count > 0 else 0
+    st.caption(
+        "Approximately 4–5 minutes of narration "
+        "at a calm speaking pace."
+    )
 
-    col_stat1, col_stat2, col_stat3 = st.columns(3)
-    with col_stat1:
-        st.caption(f"**Characters:** `{char_count}`")
-    with col_stat2:
-        st.caption(f"**Words:** `{word_count}`")
-    with col_stat3:
-        st.caption(f"**Est. Duration:** `~{est_sec}s`")
+    st.divider()
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    generate_btn = st.button("✨ Generate Audio", type="primary")
+    st.subheader("🧹 Job Controls")
 
-# Output Section
-if generate_btn:
-    if not text_input.strip():
-        st.warning("Please enter some text in the script editor first.")
-    else:
-        st.markdown("<h3 style='color: #0f172a;'>🔊 Studio Render Output</h3>", unsafe_allow_html=True)
-        with st.container(border=True):
-            progress_bar = st.progress(0.0, text="Initializing ONNX Engine...")
-            try:
-                voice_key = VOICE_MAP.get(voice_display_name, 'bm_fable')
-                
-                progress_bar.progress(0.3, text="Loading Kokoro Model...")
-                kokoro = get_kokoro_engine()
-                
-                progress_bar.progress(0.6, text="Synthesizing speech...")
-                samples, sample_rate = kokoro.create(text_input, voice=voice_key, speed=speed, lang="en-us")
+    if st.button(
+        "Start Fresh",
+        use_container_width=True,
+    ):
 
-                if samples is not None and len(samples) > 0:
-                    progress_bar.progress(0.8, text="Mixing audio tracks...")
-                    if enable_bg:
-                        bg_path = get_background_track()
-                        samples = mix_audio_beds(samples, sample_rate, bg_path, volume=bg_volume)
+        current_job = (
+            st.session_state.current_job
+        )
 
-                    progress_bar.progress(0.9, text="Formatting WAV file...")
-                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-                    sf.write(temp_file.name, samples, sample_rate)
-                    
-                    with open(temp_file.name, "rb") as f:
-                        audio_bytes = f.read()
+        if current_job:
 
-                    # Save to history but strictly keep only the latest 2 items to prevent memory overload
-                    history_item = {
-                        "text": text_input,
-                        "voice": voice_display_name,
-                        "speed": speed,
-                        "audio_bytes": audio_bytes,
-                        "filename": f"lencho_latera_voice_{len(st.session_state.history)+1}.wav"
-                    }
-                    st.session_state.history.insert(0, history_item)
-                    if len(st.session_state.history) > 2:
-                        st.session_state.history.pop()  # Drop oldest item from RAM
+            work_dir = current_job.get(
+                "work_dir"
+            )
 
-                    progress_bar.progress(1.0, text="Complete!")
+            if work_dir:
 
-                    col_audio, col_dl = st.columns([3, 1])
-                    with col_audio:
-                        st.audio(temp_file.name, format="audio/wav")
-                    with col_dl:
-                        with open(temp_file.name, "rb") as file:
-                            st.download_button(
-                                label="📥 Download WAV",
-                                data=file,
-                                file_name="lencho_latera_voice.wav",
-                                mime="audio/wav",
-                                use_container_width=True
-                            )
-                else:
-                    progress_bar.empty()
-                    st.error("No audio generated.")
+                try:
+                    shutil.rmtree(
+                        work_dir
+                    )
+                except Exception:
+                    pass
 
-            except Exception as e:
-                progress_bar.empty()
-                st.error("⚠️ An internal error occurred during synthesis:")
-                st.exception(e)
+        st.session_state.current_job = None
 
-# Session History & Archive Section (Strictly capped at 2 items to prevent memory limits)
+        st.rerun()
+
+
+# ============================================================
+# MAIN SCRIPT AREA
+# ============================================================
+
+st.header("📜 Narration Script")
+
+script = st.text_area(
+    "Paste your story here",
+    height=420,
+    placeholder=(
+        "Paste your bedtime story here...\n\n"
+        "For example:\n"
+        "Welcome to Slumber Tales English. "
+        "Tonight, we are going to visit a little "
+        "cottage at the edge of a quiet forest..."
+    ),
+    label_visibility="collapsed",
+)
+
+normalized_script = normalize_script(
+    script
+)
+
+word_count = (
+    len(normalized_script.split())
+    if normalized_script
+    else 0
+)
+
+character_count = len(
+    normalized_script
+)
+
+estimated_minutes = (
+    word_count / 120
+    if word_count
+    else 0
+)
+
+chunks_preview = (
+    split_script_into_chunks(
+        normalized_script
+    )
+    if normalized_script
+    else []
+)
+
+chunk_count = len(
+    chunks_preview
+)
+
+
+# ============================================================
+# SCRIPT STATISTICS
+# ============================================================
+
+col1, col2, col3, col4 = (
+    st.columns(4)
+)
+
+with col1:
+
+    st.metric(
+        "Words",
+        f"{word_count:,}",
+    )
+
+with col2:
+
+    st.metric(
+        "Characters",
+        f"{character_count:,}",
+    )
+
+with col3:
+
+    st.metric(
+        "Estimated duration",
+        f"{estimated_minutes:.1f} min",
+    )
+
+with col4:
+
+    st.metric(
+        "Audio chunks",
+        f"{chunk_count}",
+    )
+
+
+if chunk_count > 0:
+
+    st.caption(
+        f"Your script will be processed "
+        f"as approximately {chunk_count} "
+        f"independent chunks."
+    )
+
+
+# ============================================================
+# GENERATE BUTTON
+# ============================================================
+
+generate_button = st.button(
+    "🎙️ Generate Narration",
+    type="primary",
+    use_container_width=True,
+    disabled=not bool(
+        normalized_script
+    ),
+)
+
+
+# ============================================================
+# GENERATION PIPELINE
+# ============================================================
+
+if generate_button:
+
+    if word_count < 5:
+
+        st.error(
+            "Please enter a longer script."
+        )
+
+        st.stop()
+
+    # --------------------------------------------------------
+    # JOB ID
+    # --------------------------------------------------------
+
+    job_id = make_job_id(
+        normalized_script,
+        voice_key,
+        speed,
+    )
+
+    job_dir = (
+        create_job_directory(
+            job_id
+        )
+    )
+
+    final_wav_path = (
+        job_dir
+        / "final_narration.wav"
+    )
+
+    final_mp3_path = (
+        job_dir
+        / "final_narration.mp3"
+    )
+
+    # --------------------------------------------------------
+    # CHECK IF FINAL MP3 ALREADY EXISTS
+    # --------------------------------------------------------
+
+    if (
+        final_mp3_path.exists()
+        and final_mp3_path.stat().st_size > 0
+    ):
+
+        st.session_state.current_job = {
+            "job_id": job_id,
+            "work_dir": str(job_dir),
+            "voice": voice_key,
+            "voice_name": voice_name,
+            "speed": speed,
+            "word_count": word_count,
+            "total_chunks": chunk_count,
+            "completed_chunks": chunk_count,
+            "mp3_path": str(
+                final_mp3_path
+            ),
+        }
+
+        st.success(
+            "This narration already exists. "
+            "Using the completed MP3."
+        )
+
+        st.rerun()
+
+    # --------------------------------------------------------
+    # CURRENT JOB METADATA
+    # --------------------------------------------------------
+
+    st.session_state.current_job = {
+        "job_id": job_id,
+        "work_dir": str(job_dir),
+        "voice": voice_key,
+        "voice_name": voice_name,
+        "speed": speed,
+        "word_count": word_count,
+        "total_chunks": chunk_count,
+        "completed_chunks": 0,
+        "mp3_path": None,
+    }
+
+    # --------------------------------------------------------
+    # LOAD KOKORO
+    # --------------------------------------------------------
+
+    try:
+
+        kokoro = (
+            get_kokoro_engine()
+        )
+
+    except Exception as exc:
+
+        st.error(
+            "Could not load the Kokoro model."
+        )
+
+        st.exception(exc)
+
+        st.stop()
+
+    # --------------------------------------------------------
+    # PROGRESS UI
+    # --------------------------------------------------------
+
+    progress = st.progress(
+        0,
+        text="Preparing narration...",
+    )
+
+    status_box = st.empty()
+
+    # --------------------------------------------------------
+    # GENERATE CHUNKS
+    # --------------------------------------------------------
+
+    try:
+
+        for index, chunk_text in enumerate(
+            chunks_preview,
+            start=1,
+        ):
+
+            chunk_path = (
+                get_chunk_path(
+                    job_dir,
+                    index,
+                )
+            )
+
+            # --------------------------------------------
+            # RECOVERY
+            # --------------------------------------------
+
+            if chunk_is_complete(
+                chunk_path
+            ):
+
+                status_box.markdown(
+                    f"""
+                    <div class="status-box">
+                    ♻️ Chunk <b>{index}</b> /
+                    <b>{chunk_count}</b> already exists.
+                    Skipping regeneration.
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                progress.progress(
+                    index / chunk_count,
+                    text=(
+                        f"Recovered chunk "
+                        f"{index}/{chunk_count}"
+                    ),
+                )
+
+                continue
+
+            # --------------------------------------------
+            # GENERATE
+            # --------------------------------------------
+
+            status_box.markdown(
+                f"""
+                <div class="status-box">
+                🎙️ Generating chunk
+                <b>{index}</b> /
+                <b>{chunk_count}</b>...
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            progress.progress(
+                (index - 1)
+                / chunk_count,
+                text=(
+                    f"Generating chunk "
+                    f"{index}/{chunk_count}"
+                ),
+            )
+
+            generate_chunk(
+                kokoro=kokoro,
+                text=chunk_text,
+                voice=voice_key,
+                speed=speed,
+                output_path=chunk_path,
+            )
+
+            gc.collect()
+
+            progress.progress(
+                index / chunk_count,
+                text=(
+                    f"Completed chunk "
+                    f"{index}/{chunk_count}"
+                ),
+            )
+
+        # ----------------------------------------------------
+        # VERIFY CHUNKS
+        # ----------------------------------------------------
+
+        chunk_paths = []
+
+        for index in range(
+            1,
+            chunk_count + 1,
+        ):
+
+            path = get_chunk_path(
+                job_dir,
+                index,
+            )
+
+            if not chunk_is_complete(
+                path
+            ):
+
+                raise RuntimeError(
+                    f"Chunk {index} is missing "
+                    f"or invalid."
+                )
+
+            chunk_paths.append(
+                path
+            )
+
+        # ----------------------------------------------------
+        # COMBINE WAV
+        # ----------------------------------------------------
+
+        status_box.markdown(
+            """
+            <div class="status-box">
+            🔗 Combining completed chunks...
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        progress.progress(
+            0.90,
+            text="Combining audio chunks...",
+        )
+
+        combine_wav_files(
+            chunk_paths,
+            final_wav_path,
+        )
+
+        gc.collect()
+
+        # ----------------------------------------------------
+        # CONVERT TO MP3
+        # ----------------------------------------------------
+
+        status_box.markdown(
+            """
+            <div class="status-box">
+            🎧 Creating final MP3...
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        progress.progress(
+            0.96,
+            text="Creating MP3...",
+        )
+
+        convert_wav_to_mp3(
+            final_wav_path,
+            final_mp3_path,
+        )
+
+        # ----------------------------------------------------
+        # IMPORTANT:
+        # DELETE EVERY WAV AFTER MP3 SUCCEEDS
+        # ----------------------------------------------------
+
+        delete_all_wav_files(
+            job_dir
+        )
+
+        # ----------------------------------------------------
+        # FINISHED
+        # ----------------------------------------------------
+
+        progress.progress(
+            1.0,
+            text="Narration complete!",
+        )
+
+        status_box.success(
+            f"✅ Finished {chunk_count} chunks. "
+            f"Final MP3 is ready."
+        )
+
+        completed_job = {
+            "job_id": job_id,
+            "work_dir": str(job_dir),
+            "voice": voice_key,
+            "voice_name": voice_name,
+            "speed": speed,
+            "word_count": word_count,
+            "total_chunks": chunk_count,
+            "completed_chunks": chunk_count,
+            "mp3_path": str(
+                final_mp3_path
+            ),
+        }
+
+        st.session_state.current_job = (
+            completed_job
+        )
+
+        add_history_item(
+            completed_job
+        )
+
+        cleanup_history_dirs()
+
+    except Exception as exc:
+
+        st.error(
+            "Generation stopped."
+        )
+
+        st.exception(exc)
+
+        completed = (
+            count_completed_chunks(
+                job_dir,
+                chunk_count,
+            )
+        )
+
+        st.info(
+            f"Recovery information: "
+            f"{completed}/{chunk_count} "
+            f"chunks are already complete."
+        )
+
+        st.warning(
+            "You can press Generate Narration "
+            "again with the same settings. "
+            "Existing completed chunks will be skipped."
+        )
+
+
+# ============================================================
+# CURRENT RESULT
+# ============================================================
+
+current_job = (
+    st.session_state.current_job
+)
+
+if current_job:
+
+    mp3_path = current_job.get(
+        "mp3_path"
+    )
+
+    work_dir = current_job.get(
+        "work_dir"
+    )
+
+    st.divider()
+
+    st.header("🎧 Current Narration")
+
+    if (
+        mp3_path
+        and os.path.exists(mp3_path)
+    ):
+
+        st.subheader("MP3")
+
+        st.audio(
+            mp3_path,
+            format="audio/mpeg",
+        )
+
+        mp3_size_mb = (
+            os.path.getsize(mp3_path)
+            / (1024 * 1024)
+        )
+
+        st.caption(
+            f"MP3 size: "
+            f"{mp3_size_mb:.1f} MB"
+        )
+
+        with open(
+            mp3_path,
+            "rb",
+        ) as mp3_file:
+
+            st.download_button(
+                "⬇️ Download MP3",
+                data=mp3_file,
+                file_name=(
+                    "slumber_tales_narration.mp3"
+                ),
+                mime="audio/mpeg",
+                use_container_width=True,
+                key="download_mp3_current",
+            )
+
+        st.success(
+            "Your final MP3 is ready. "
+            "All WAV files have been deleted."
+        )
+
+    if work_dir:
+
+        st.caption(
+            "Only the final MP3 is kept after "
+            "successful conversion."
+        )
+
+
+# ============================================================
+# HISTORY
+# ============================================================
+
 if st.session_state.history:
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("<h3 style='color: #0f172a;'>📜 Recent Session Archive (Last 2)</h3>", unsafe_allow_html=True)
-    with st.container(border=True):
-        for idx, item in enumerate(st.session_state.history):
-            item_num = len(st.session_state.history) - idx
-            st.markdown(f"**#{item_num} | Persona:** `{item['voice']}` | **Speed:** `{item['speed']}x`")
-            snippet = item['text'][:100] + "..." if len(item['text']) > 100 else item['text']
-            st.caption(f"**Script:** {snippet}")
-            
-            hist_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-            hist_temp.write(item['audio_bytes'])
-            hist_temp.close()
-            
-            col_ha, col_hd = st.columns([3, 1])
-            with col_ha:
-                st.audio(hist_temp.name, format="audio/wav")
-            with col_hd:
-                st.download_button(
-                    label="📥 Download",
-                    data=item['audio_bytes'],
-                    file_name=item['filename'],
-                    mime="audio/wav",
-                    key=f"history_download_{idx}",
-                    use_container_width=True
+
+    st.divider()
+
+    st.header("🕘 Recent Jobs")
+
+    for number, item in enumerate(
+        st.session_state.history,
+        start=1,
+    ):
+
+        job_mp3 = item.get(
+            "mp3_path"
+        )
+
+        label = (
+            f"{number}. "
+            f"{item.get('voice_name', 'Kokoro')} — "
+            f"{item.get('word_count', 0):,} words — "
+            f"{item.get('total_chunks', 0)} chunks"
+        )
+
+        with st.expander(label):
+
+            st.write(
+                f"**Voice:** "
+                f"{item.get('voice_name', '-')}"
+            )
+
+            st.write(
+                f"**Speed:** "
+                f"{item.get('speed', '-')}"
+            )
+
+            st.write(
+                f"**Words:** "
+                f"{item.get('word_count', 0):,}"
+            )
+
+            st.write(
+                f"**Chunks:** "
+                f"{item.get('total_chunks', 0)}"
+            )
+
+            if (
+                job_mp3
+                and os.path.exists(job_mp3)
+            ):
+
+                st.audio(
+                    job_mp3,
+                    format="audio/mpeg",
                 )
-            if idx < len(st.session_state.history) - 1:
-                st.divider()
+
+                with open(
+                    job_mp3,
+                    "rb",
+                ) as mp3_file:
+
+                    st.download_button(
+                        "⬇️ Download MP3",
+                        data=mp3_file,
+                        file_name=(
+                            "slumber_tales_narration.mp3"
+                        ),
+                        mime="audio/mpeg",
+                        key=(
+                            f"history_mp3_{number}_"
+                            f"{item.get('job_id')}"
+                        ),
+                    )
+
+            else:
+
+                st.caption(
+                    "MP3 file is no longer available "
+                    "in the current Streamlit session."
+                )
+
+
+# ============================================================
+# FOOTER
+# ============================================================
+
+st.divider()
+
+st.caption(
+    "Lenchos Audio Studio • Kokoro ONNX • "
+    "Chunked MP3 generation with disk-based recovery"
+)
