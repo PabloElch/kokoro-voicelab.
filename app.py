@@ -206,7 +206,7 @@ st.markdown(
     </style>
     <div class="hero-container">
         <div style="font-weight: 800; font-size: 28px; margin-bottom: 8px;">
-            🎙️ LENCHOS AUDIO STUDIO
+            🎙️ <span class="glowing-name">LENCHOS</span> AUDIO STUDIO
         </div>
         <div style="font-size: 16px; color: #a1a1aa;">
             Built by <span class="glowing-name">Lencho Lemessa</span> to deliver high-quality voice synthesis.
@@ -469,8 +469,8 @@ with tab_single:
         st.metric("Chunks", f"{len(single_chunks)}")
 
     if st.button("🎙️ Generate Narration", type="primary", use_container_width=True, key="gen_single_btn"):
-        if single_words < 3:
-            st.error("Please enter a longer script.")
+        if single_words < 1:
+            st.error("Please enter a valid script.")
             st.stop()
 
         job_id = make_job_id(norm_single, single_voice, single_speed)
@@ -561,7 +561,7 @@ with tab_dual:
         st.metric("Total Words", f"{dual_words:,}")
 
     if st.button("🎙️ Generate Conversation Audio", type="primary", use_container_width=True, key="gen_dual_btn"):
-        if dual_words < 3:
+        if dual_words < 1:
             st.error("Please enter a valid dialogue script.")
             st.stop()
 
