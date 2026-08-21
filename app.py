@@ -336,7 +336,7 @@ st.markdown(
     }
     
     .glowing-name {
-        color: #4f46e5;
+        color: #818cf8;
         font-weight: 700;
         animation: softGlow 3s infinite ease-in-out;
     }
@@ -346,12 +346,12 @@ st.markdown(
         <div class="hero-title" style="font-weight: 800; font-size: 28px; margin-bottom: 8px;">
             🎙️ LENCHOS AUDIO STUDIO
         </div>
-        <div class="hero-subtitle" style="font-size: 16px; color: #64748b;">
+        <div class="hero-subtitle" style="font-size: 16px; color: #a1a1aa;">
             Built by <span class="glowing-name">Lencho Lemessa</span> to deliver soothing, long-form voice synthesis.
         </div>
     </div>
     """,
-    unsafe_allow_auth=True, # Note: Streamlit expects unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 
@@ -1605,103 +1605,56 @@ if generate_button:
                 unsafe_allow_html=True,
             )
 
-            progress.progress(
-                (index - 1)
-                / chunk_count,
-                text=(
-                    f"Generating chunk "
-                    f"{index}/{chunk_count}"
-                ),
-            )
-
             generate_chunk(
-                kokoro=kokoro,
-                text=chunk_text,
-                voice=voice_key,
-                speed=speed,
-                output_path=chunk_path,
+                kokoro,
+                chunk_text,
+                voice_key,
+                speed,
+                chunk_path,
             )
-
-            gc.collect()
 
             progress.progress(
                 index / chunk_count,
                 text=(
-                    f"Completed chunk "
+                    f"Generated chunk "
                     f"{index}/{chunk_count}"
                 ),
             )
 
         # ----------------------------------------------------
-        # VERIFY CHUNKS
-        # ----------------------------------------------------
-
-        chunk_paths = []
-
-        for index in range(
-            1,
-            chunk_count + 1,
-        ):
-
-            path = get_chunk_path(
-                job_dir,
-                index,
-            )
-
-            if not chunk_is_complete(
-                path
-            ):
-
-                raise RuntimeError(
-                    f"Chunk {index} is missing "
-                    f"or invalid."
-                )
-
-            chunk_paths.append(
-                path
-            )
-
-        # ----------------------------------------------------
-        # COMBINE WAV
+        # COMBINE
         # ----------------------------------------------------
 
         status_box.markdown(
             """
             <div class="status-box">
-            🔗 Combining completed chunks...
+            🔗 Combining audio chunks...
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-        progress.progress(
-            0.90,
-            text="Combining audio chunks...",
-        )
+        chunk_paths = [
+            get_chunk_path(job_dir, i)
+            for i in range(1, chunk_count + 1)
+        ]
 
         combine_wav_files(
             chunk_paths,
             final_wav_path,
         )
 
-        gc.collect()
-
         # ----------------------------------------------------
-        # CONVERT TO MP3
+        # MP3 CONVERSION
         # ----------------------------------------------------
 
         status_box.markdown(
             """
             <div class="status-box">
-            🎧 Creating final MP3...
+            🎵 Converting final audio to MP3...
             </div>
             """,
             unsafe_allow_html=True,
-        )
-
-        progress.progress(
-            0.96,
-            text="Creating MP3...",
         )
 
         convert_wav_to_mp3(
@@ -1710,29 +1663,12 @@ if generate_button:
         )
 
         # ----------------------------------------------------
-        # IMPORTANT:
-        # DELETE EVERY WAV AFTER MP3 SUCCEEDS
+        # CLEANUP WAVS
         # ----------------------------------------------------
 
-        delete_all_wav_files(
-            job_dir
-        )
+        delete_all_wav_files(job_dir)
 
-        # ----------------------------------------------------
-        # FINISHED
-        # ----------------------------------------------------
-
-        progress.progress(
-            1.0,
-            text="Narration complete!",
-        )
-
-        status_box.success(
-            f"✅ Finished {chunk_count} chunks. "
-            f"Final MP3 is ready."
-        )
-
-        completed_job = {
+        st.session_state.current_job = {
             "job_id": job_id,
             "work_dir": str(job_dir),
             "voice": voice_key,
@@ -1741,213 +1677,57 @@ if generate_button:
             "word_count": word_count,
             "total_chunks": chunk_count,
             "completed_chunks": chunk_count,
-            "mp3_path": str(
-                final_mp3_path
-            ),
+            "mp3_path": str(final_mp3_path),
         }
 
-        st.session_state.current_job = (
-            completed_job
-        )
-
-        add_history_item(
-            completed_job
-        )
-
+        add_history_item(st.session_state.current_job)
         cleanup_history_dirs()
 
+        status_box.empty()
+        progress.empty()
+
+        st.success("Narration generation complete!")
+        st.rerun()
+
     except Exception as exc:
-
-        st.error(
-            "Generation stopped."
-        )
-
+        status_box.empty()
+        progress.empty()
+        st.error("An error occurred during audio generation.")
         st.exception(exc)
 
-        completed = (
-            count_completed_chunks(
-                job_dir,
-                chunk_count,
-            )
-        )
-
-        st.info(
-            f"Recovery information: "
-            f"{completed}/{chunk_count} "
-            f"chunks are already complete."
-        )
-
-        st.warning(
-            "You can press Generate Narration "
-            "again with the same settings. "
-            "Existing completed chunks will be skipped."
-        )
-
 
 # ============================================================
-# CURRENT RESULT
+# PLAYER & DOWNLOAD SECTION
 # ============================================================
 
-current_job = (
-    st.session_state.current_job
-)
+current_job = st.session_state.current_job
 
-if current_job:
+if current_job and current_job.get("mp3_path"):
+    mp3_path_str = current_job.get("mp3_path")
 
-    mp3_path = current_job.get(
-        "mp3_path"
-    )
+    if mp3_path_str and Path(mp3_path_str).exists():
+        st.divider()
+        st.header("🎧 Final Narration")
 
-    work_dir = current_job.get(
-        "work_dir"
-    )
+        with open(mp3_path_str, "rb") as f:
+            mp3_bytes = f.read()
 
-    st.divider()
+        st.audio(mp3_bytes, format="audio/mpeg")
 
-    st.header("🎧 Current Narration")
+        col_dl, col_info = st.columns([1, 2])
 
-    if (
-        mp3_path
-        and os.path.exists(mp3_path)
-    ):
-
-        st.subheader("MP3")
-
-        st.audio(
-            mp3_path,
-            format="audio/mpeg",
-        )
-
-        mp3_size_mb = (
-            os.path.getsize(mp3_path)
-            / (1024 * 1024)
-        )
-
-        st.caption(
-            f"MP3 size: "
-            f"{mp3_size_mb:.1f} MB"
-        )
-
-        with open(
-            mp3_path,
-            "rb",
-        ) as mp3_file:
-
+        with col_dl:
             st.download_button(
-                "⬇️ Download MP3",
-                data=mp3_file,
-                file_name=(
-                    "slumber_tales_narration.mp3"
-                ),
+                label="📥 Download MP3",
+                data=mp3_bytes,
+                file_name="lenchos_narration.mp3",
                 mime="audio/mpeg",
                 use_container_width=True,
-                key="download_mp3_current",
             )
 
-        st.success(
-            "Your final MP3 is ready. "
-            "All WAV files have been deleted."
-        )
-
-    if work_dir:
-
-        st.caption(
-            "Only the final MP3 is kept after "
-            "successful conversion."
-        )
-
-
-# ============================================================
-# HISTORY
-# ============================================================
-
-if st.session_state.history:
-
-    st.divider()
-
-    st.header("🕘 Recent Jobs")
-
-    for number, item in enumerate(
-        st.session_state.history,
-        start=1,
-    ):
-
-        job_mp3 = item.get(
-            "mp3_path"
-        )
-
-        label = (
-            f"{number}. "
-            f"{item.get('voice_name', 'Kokoro')} — "
-            f"{item.get('word_count', 0):,} words — "
-            f"{item.get('total_chunks', 0)} chunks"
-        )
-
-        with st.expander(label):
-
-            st.write(
-                f"**Voice:** "
-                f"{item.get('voice_name', '-')}"
+        with col_info:
+            st.info(
+                f"Narrator: **{current_job.get('voice_name')}** | "
+                f"Words: **{current_job.get('word_count'):,}** | "
+                f"Speed: **{current_job.get('speed')}x**"
             )
-
-            st.write(
-                f"**Speed:** "
-                f"{item.get('speed', '-')}"
-            )
-
-            st.write(
-                f"**Words:** "
-                f"{item.get('word_count', 0):,}"
-            )
-
-            st.write(
-                f"**Chunks:** "
-                f"{item.get('total_chunks', 0)}"
-            )
-
-            if (
-                job_mp3
-                and os.path.exists(job_mp3)
-            ):
-
-                st.audio(
-                    job_mp3,
-                    format="audio/mpeg",
-                )
-
-                with open(
-                    job_mp3,
-                    "rb",
-                ) as mp3_file:
-
-                    st.download_button(
-                        "⬇️ Download MP3",
-                        data=mp3_file,
-                        file_name=(
-                            "slumber_tales_narration.mp3"
-                        ),
-                        mime="audio/mpeg",
-                        key=(
-                            f"history_mp3_{number}_"
-                            f"{item.get('job_id')}"
-                        ),
-                    )
-
-            else:
-
-                st.caption(
-                    "MP3 file is no longer available "
-                    "in the current Streamlit session."
-                )
-
-
-# ============================================================
-# FOOTER
-# ============================================================
-
-st.divider()
-
-st.caption(
-    "Lenchos Audio Studio • Kokoro ONNX • "
-    "Chunked MP3 generation with disk-based recovery"
-)
