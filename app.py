@@ -347,7 +347,7 @@ st.markdown(
             🎙️ LENCHOS AUDIO STUDIO
         </div>
         <div class="hero-subtitle" style="font-size: 16px; color: #a1a1aa;">
-            Built by <span class="glowing-name">Lencho Lemessa</span> to deliver soothing, long-form voice synthesis.
+            Built by <span class="glowing-name">Lencho Lemessa</span> to deliver multi-speaker conversation &amp; voice synthesis.
         </div>
     </div>
     """,
@@ -375,12 +375,10 @@ def get_base_work_dir():
         Path(tempfile.gettempdir())
         / "lenchos_audio_studio"
     )
-
     base_dir.mkdir(
         parents=True,
         exist_ok=True,
     )
-
     return base_dir
 
 
@@ -391,16 +389,12 @@ def cleanup_old_jobs(keep_job_dirs=None):
     base_dir = get_base_work_dir()
 
     for item in base_dir.iterdir():
-
         if not item.is_dir():
             continue
-
         if item.name in {"model"}:
             continue
-
         if str(item) in keep_job_dirs:
             continue
-
         try:
             shutil.rmtree(item)
         except Exception:
@@ -441,36 +435,20 @@ def download_file(url, destination):
     show_spinner="Loading Kokoro model..."
 )
 def get_kokoro_engine():
-
     model_dir = (
         get_base_work_dir()
         / "model"
     )
-
     model_dir.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    model_path = (
-        model_dir
-        / MODEL_FILENAME
-    )
+    model_path = model_dir / MODEL_FILENAME
+    voices_path = model_dir / VOICES_FILENAME
 
-    voices_path = (
-        model_dir
-        / VOICES_FILENAME
-    )
-
-    download_file(
-        MODEL_URL,
-        model_path,
-    )
-
-    download_file(
-        VOICES_URL,
-        voices_path,
-    )
+    download_file(MODEL_URL, model_path)
+    download_file(VOICES_URL, voices_path)
 
     kokoro = Kokoro(
         str(model_path),
@@ -481,266 +459,123 @@ def get_kokoro_engine():
 
 
 # ============================================================
-# TEXT PROCESSING
+# VOICE MAP
 # ============================================================
 
-def normalize_script(text):
-    text = text.replace("\r\n", "\n")
-    text = text.replace("\r", "\n")
-
-    lines = []
-
-    for line in text.split("\n"):
-
-        cleaned = re.sub(
-            r"\s+",
-            " ",
-            line.strip(),
-        )
-
-        if cleaned:
-            lines.append(cleaned)
-
-    return "\n\n".join(lines)
+VOICE_MAP = {
+    "🇺🇸 Beza (American Female - Warm)": "af_heart",
+    "🇺🇸 Birikti (American Female - Soft)": "af_bella",
+    "🇺🇸 Demoze (American Female - Clear)": "af_nicole",
+    "🇺🇸 Lalise (American Female - News)": "af_sarah",
+    "🇺🇸 Efrata (American Female - Casual)": "af_sky",
+    "🇺🇸 Lencho (American Male - Deep)": "am_adam",
+    "🇺🇸 Dego (American Male - Crisp)": "am_michael",
+    "🇬🇧 Bontu (British Female - Professional)": "bf_emma",
+    "🇬🇧 Hawi (British Female - Warm)": "bf_isabella",
+    "🇬🇧 Lalisa (British Male - Expressive)": "bm_george",
+    "🇬🇧 Lemi (British Male - Narration)": "bm_fable",
+}
 
 
-def split_long_sentence(
-    sentence,
-    target_words,
-):
-    words = sentence.split()
+# ============================================================
+# DIALOGUE SCRIPT PARSER
+# ============================================================
 
-    if len(words) <= target_words:
-        return [sentence.strip()]
+def parse_dialogue_script(text, default_voice):
+    """
+    Parses a conversation script formatted like:
+    Speaker 1: Hello there!
+    Speaker 2: Hi back!
 
-    pieces = []
+    Or falls back to assigning lines line-by-line / block-by-block.
+    Recognizes patterns like 'Name:' or '[VoiceKey]:' at start of lines.
+    """
+    lines = text.strip().split("\n")
+    parsed_turns = []
+    
+    # Inverted lookup for matching names/labels if user typed them out
+    name_to_key = {
+        "speaker 1": "af_heart",
+        "speaker 2": "am_adam",
+        "bella": "af_bella",
+        "michael": "am_michael",
+    }
 
-    for start in range(
-        0,
-        len(words),
-        target_words,
-    ):
-
-        piece = " ".join(
-            words[
-                start:start + target_words
-            ]
-        )
-
-        if piece.strip():
-            pieces.append(
-                piece.strip()
-            )
-
-    return pieces
-
-
-def split_script_into_chunks(
-    text,
-    target_words=TARGET_WORDS_PER_CHUNK,
-):
-
-    text = normalize_script(text)
-
-    if not text:
-        return []
-
-    paragraphs = re.split(
-        r"\n\s*\n",
-        text,
-    )
-
-    sentences = []
-
-    for paragraph in paragraphs:
-
-        paragraph = paragraph.strip()
-
-        if not paragraph:
+    for line in lines:
+        line_str = line.strip()
+        if not line_str:
             continue
-
-        paragraph_sentences = re.split(
-            r"(?<=[.!?])\s+",
-            paragraph,
-        )
-
-        for sentence in paragraph_sentences:
-
-            sentence = sentence.strip()
-
-            if not sentence:
-                continue
-
-            sentences.extend(
-                split_long_sentence(
-                    sentence,
-                    target_words,
-                )
-            )
-
-    chunks = []
-
-    current = []
-    current_words = 0
-
-    for sentence in sentences:
-
-        sentence_words = len(
-            sentence.split()
-        )
-
-        if (
-            current
-            and current_words + sentence_words
-            > target_words
-        ):
-
-            chunks.append(
-                " ".join(current).strip()
-            )
-
-            current = []
-            current_words = 0
-
-        current.append(sentence)
-        current_words += sentence_words
-
-    if current:
-
-        chunks.append(
-            " ".join(current).strip()
-        )
-
-    return chunks
+            
+        # Check if line contains speaker marker (e.g. "Beza: Hello")
+        match = re.match(r"^([\w\s]+?)\s*:\s*(.+)$", line_str)
+        if match:
+            speaker_label = match.group(1).strip().lower()
+            utterance = match.group(2).strip()
+            
+            # Map label to actual voice key if possible, else use default
+            assigned_voice = name_to_key.get(speaker_label, default_voice)
+            if utterance:
+                parsed_turns.append({"voice": assigned_voice, "text": utterance})
+        else:
+            # If no explicit marker, treat the entire line as spoken by default voice
+            parsed_turns.append({"voice": default_voice, "text": line_str})
+            
+    return parsed_turns
 
 
 # ============================================================
-# JOB ID
+# JOB ID & DIRECTORY
 # ============================================================
 
-def make_job_id(
-    script,
-    voice,
-    speed,
-):
-
-    payload = (
-        f"{script}|"
-        f"{voice}|"
-        f"{speed:.4f}"
-    )
-
-    digest = hashlib.sha256(
-        payload.encode("utf-8")
-    ).hexdigest()
-
+def make_job_id(script, default_voice, speed):
+    payload = f"{script}|{default_voice}|{speed:.4f}"
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
     return digest[:16]
 
 
-# ============================================================
-# JOB DIRECTORY
-# ============================================================
-
 def create_job_directory(job_id):
-
     base_dir = get_base_work_dir()
-
-    job_dir = (
-        base_dir
-        / f"job_{job_id}"
-    )
-
-    job_dir.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    chunks_dir = (
-        job_dir / "chunks"
-    )
-
-    chunks_dir.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
+    job_dir = base_dir / f"job_{job_id}"
+    job_dir.mkdir(parents=True, exist_ok=True)
+    (job_dir / "chunks").mkdir(parents=True, exist_ok=True)
     return job_dir
 
 
-# ============================================================
-# CHUNK PATH
-# ============================================================
+def get_chunk_path(job_dir, index):
+    return Path(job_dir) / "chunks" / f"chunk_{index:03d}.wav"
 
-def get_chunk_path(
-    job_dir,
-    index,
-):
-
-    return (
-        Path(job_dir)
-        / "chunks"
-        / f"chunk_{index:03d}.wav"
-    )
-
-
-# ============================================================
-# CHUNK VALIDATION
-# ============================================================
 
 def chunk_is_complete(path):
-
     path = Path(path)
-
-    if not path.exists():
+    if not path.exists() or path.stat().st_size < 1000:
         return False
-
-    if path.stat().st_size < 1000:
-        return False
-
     try:
-
-        info = sf.info(
-            str(path)
-        )
-
-        return (
-            info.frames > 0
-            and info.samplerate > 0
-        )
-
+        info = sf.info(str(path))
+        return info.frames > 0 and info.samplerate > 0
     except Exception:
         return False
 
 
 # ============================================================
-# GENERATE ONE CHUNK
+# CHUNK GENERATION (MULTI-SPEAKER SUPPORTS TURNS)
 # ============================================================
 
-def generate_chunk(
+def generate_dialogue_chunk(
     kokoro,
-    text,
-    voice,
+    turn_text,
+    voice_key,
     speed,
     output_path,
 ):
-
-    samples, sample_rate = (
-        kokoro.create(
-            text,
-            voice=voice,
-            speed=float(speed),
-            lang="en-us",
-        )
+    samples, sample_rate = kokoro.create(
+        turn_text,
+        voice=voice_key,
+        speed=float(speed),
+        lang="en-us",
     )
 
-    samples = np.asarray(
-        samples,
-        dtype=np.float32,
-    )
-
-    sample_rate = int(
-        sample_rate
-    )
+    samples = np.asarray(samples, dtype=np.float32)
+    sample_rate = int(sample_rate)
 
     sf.write(
         str(output_path),
@@ -750,113 +585,21 @@ def generate_chunk(
     )
 
     del samples
-
     gc.collect()
-
     return sample_rate
-
-
-# ============================================================
-# COMBINE WAV CHUNKS
-# ============================================================
-
-def combine_wav_files(
-    chunk_paths,
-    output_path,
-):
-
-    if not chunk_paths:
-        raise ValueError(
-            "No audio chunks were found."
-        )
-
-    first_info = sf.info(
-        str(chunk_paths[0])
-    )
-
-    sample_rate = (
-        first_info.samplerate
-    )
-
-    channels = (
-        first_info.channels
-    )
-
-    with sf.SoundFile(
-        str(output_path),
-        mode="w",
-        samplerate=sample_rate,
-        channels=channels,
-        subtype="PCM_16",
-        format="WAV",
-    ) as output_file:
-
-        for path in chunk_paths:
-
-            with sf.SoundFile(
-                str(path),
-                mode="r",
-            ) as input_file:
-
-                if (
-                    input_file.samplerate
-                    != sample_rate
-                ):
-                    raise ValueError(
-                        "Chunk sample rates do not match."
-                    )
-
-                if (
-                    input_file.channels
-                    != channels
-                ):
-                    raise ValueError(
-                        "Chunk channel counts do not match."
-                    )
-
-                while True:
-
-                    block = (
-                        input_file.read(
-                            65536,
-                            dtype="float32",
-                        )
-                    )
-
-                    if len(block) == 0:
-                        break
-
-                    output_file.write(
-                        block
-                    )
-
-                    del block
-
-    gc.collect()
 
 
 # ============================================================
 # MP3 CONVERSION
 # ============================================================
 
-def convert_wav_to_mp3(
-    wav_path,
-    mp3_path,
-):
-
+def convert_wav_to_mp3(wav_path, mp3_path):
     try:
         import imageio_ffmpeg
-
     except ImportError as exc:
+        raise RuntimeError("imageio-ffmpeg is not installed.") from exc
 
-        raise RuntimeError(
-            "imageio-ffmpeg is not installed. "
-            "Add imageio-ffmpeg to requirements.txt."
-        ) from exc
-
-    ffmpeg_exe = (
-        imageio_ffmpeg.get_ffmpeg_exe()
-    )
+    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
 
     command = [
         ffmpeg_exe,
@@ -880,142 +623,39 @@ def convert_wav_to_mp3(
     )
 
     if result.returncode != 0:
-
-        raise RuntimeError(
-            "FFmpeg MP3 conversion failed:\n\n"
-            + result.stderr[-3000:]
-        )
-
-    if (
-        not mp3_path.exists()
-        or mp3_path.stat().st_size == 0
-    ):
-
-        raise RuntimeError(
-            "MP3 conversion completed but "
-            "the MP3 file was not created."
-        )
-
-
-# ============================================================
-# DELETE ALL WAV FILES
-# ============================================================
-
-def delete_all_wav_files(
-    job_dir,
-):
-
-    job_dir = Path(job_dir)
-
-    final_wav = (
-        job_dir
-        / "final_narration.wav"
-    )
-
-    if final_wav.exists():
-
-        try:
-            final_wav.unlink()
-        except Exception:
-            pass
-
-    chunks_dir = (
-        job_dir / "chunks"
-    )
-
-    if chunks_dir.exists():
-
-        for wav_file in chunks_dir.glob(
-            "*.wav"
-        ):
-
-            try:
-                wav_file.unlink()
-            except Exception:
-                pass
-
-        try:
-
-            if not any(
-                chunks_dir.iterdir()
-            ):
-                chunks_dir.rmdir()
-
-        except Exception:
-            pass
-
-    gc.collect()
+        raise RuntimeError("FFmpeg MP3 conversion failed:\n\n" + result.stderr[-3000:])
 
 
 # ============================================================
 # PREVIEW VOICE AS MP3
 # ============================================================
 
-def generate_preview_mp3(
-    kokoro,
-    voice,
-    speed=1.0,
-):
-
-    preview_text = (
-        "Hello. This is a quick preview "
-        "of this voice persona. "
-        "I hope you enjoy listening."
+def generate_preview_mp3(kokoro, voice, speed=1.0):
+    preview_text = "Hello. This is a quick preview of this multi-person voice persona."
+    samples, sample_rate = kokoro.create(
+        preview_text,
+        voice=voice,
+        speed=float(speed),
+        lang="en-us",
     )
 
-    samples, sample_rate = (
-        kokoro.create(
-            preview_text,
-            voice=voice,
-            speed=float(speed),
-            lang="en-us",
-        )
-    )
+    samples = np.asarray(samples, dtype=np.float32)
+    sample_rate = int(sample_rate)
 
-    samples = np.asarray(
-        samples,
-        dtype=np.float32,
-    )
-
-    sample_rate = int(
-        sample_rate
-    )
-
-    # Convert float audio to signed 16-bit PCM.
-    samples_int16 = np.clip(
-        samples,
-        -1.0,
-        1.0,
-    )
-
-    samples_int16 = (
-        samples_int16 * 32767
-    ).astype(
-        np.int16
-    )
-
-    raw_audio = (
-        samples_int16
-        .tobytes()
-    )
+    samples_int16 = np.clip(samples, -1.0, 1.0)
+    samples_int16 = (samples_int16 * 32767).astype(np.int16)
+    raw_audio = samples_int16.tobytes()
 
     del samples
     del samples_int16
-
     gc.collect()
 
     try:
         import imageio_ffmpeg
-
     except ImportError as exc:
+        raise RuntimeError("imageio-ffmpeg is not installed.") from exc
 
-        raise RuntimeError(
-            "imageio-ffmpeg is not installed."
-        ) from exc
-
-    ffmpeg_exe = (
-        imageio_ffmpeg.get_ffmpeg_exe()
-    )
+    ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
 
     command = [
         ffmpeg_exe,
@@ -1046,150 +686,10 @@ def generate_preview_mp3(
         stderr=subprocess.PIPE,
     )
 
-    del raw_audio
-
-    gc.collect()
-
     if result.returncode != 0:
-
-        raise RuntimeError(
-            "Could not create MP3 preview:\n\n"
-            + result.stderr.decode(
-                "utf-8",
-                errors="ignore",
-            )[-3000:]
-        )
-
-    if not result.stdout:
-
-        raise RuntimeError(
-            "MP3 preview was empty."
-        )
+        raise RuntimeError("Could not create MP3 preview.")
 
     return result.stdout
-
-
-# ============================================================
-# JOB STATUS
-# ============================================================
-
-def count_completed_chunks(
-    job_dir,
-    total_chunks,
-):
-
-    count = 0
-
-    for index in range(
-        1,
-        total_chunks + 1,
-    ):
-
-        path = get_chunk_path(
-            job_dir,
-            index,
-        )
-
-        if chunk_is_complete(path):
-            count += 1
-
-    return count
-
-
-# ============================================================
-# HISTORY
-# ============================================================
-
-def add_history_item(item):
-
-    history = (
-        st.session_state.history
-    )
-
-    history = [
-        old
-        for old in history
-        if old.get("job_id")
-        != item.get("job_id")
-    ]
-
-    history.insert(
-        0,
-        item,
-    )
-
-    st.session_state.history = (
-        history[:2]
-    )
-
-
-def cleanup_history_dirs():
-
-    keep_dirs = set()
-
-    current_job = (
-        st.session_state.current_job
-    )
-
-    if current_job:
-
-        work_dir = current_job.get(
-            "work_dir"
-        )
-
-        if work_dir:
-            keep_dirs.add(
-                str(work_dir)
-            )
-
-    for item in (
-        st.session_state.history
-    ):
-
-        work_dir = item.get(
-            "work_dir"
-        )
-
-        if work_dir:
-            keep_dirs.add(
-                str(work_dir)
-            )
-
-    base_dir = get_base_work_dir()
-
-    for item in base_dir.iterdir():
-
-        if not item.is_dir():
-            continue
-
-        if item.name == "model":
-            continue
-
-        if str(item) not in keep_dirs:
-
-            try:
-                shutil.rmtree(item)
-            except Exception:
-                pass
-
-
-# ============================================================
-# VOICE MAP
-# ============================================================
-
-VOICE_MAP = {
-    "🇺🇸 Beza (American Female - Warm)": "af_heart",
-    "🇺🇸 Birikti (American Female - Soft)": "af_bella",
-    "🇺🇸 Demoze (American Female - Clear)": "af_nicole",
-    "🇺🇸 Lalise (American Female - News)": "af_sarah",
-    "🇺🇸 Efrata (American Female - Casual)": "af_sky",
-    "🇺🇸 Lencho (American Male - Deep)": "am_adam",
-    "🇺🇸 Dego (American Male - Crisp)": "am_michael",
-    "🇬🇧 Bontu (British Female - Professional)": "bf_emma",
-    "🇬🇧 Hawi (British Female - Warm)": "bf_isabella",
-    "🇬🇧 Lalisa (British Male - Expressive)": "bm_george",
-    "🇬🇧 Lemi (British Male - Narration)": "bm_fable",
-}
 
 
 # ============================================================
@@ -1197,18 +697,21 @@ VOICE_MAP = {
 # ============================================================
 
 with st.sidebar:
+    st.header("🎙️ Voice & Dialogue Settings")
 
-    st.header("🎙️ Voice Settings")
-
-    voice_name = st.selectbox(
-        "Narrator",
+    default_voice_name = st.selectbox(
+        "Default / Speaker 1 Voice",
         list(VOICE_MAP.keys()),
-        index=9,
+        index=0,
     )
+    default_voice_key = VOICE_MAP[default_voice_name]
 
-    voice_key = VOICE_MAP[
-        voice_name
-    ]
+    secondary_voice_name = st.selectbox(
+        "Speaker 2 Voice (For alternating turns)",
+        list(VOICE_MAP.keys()),
+        index=5,
+    )
+    secondary_voice_key = VOICE_MAP[secondary_voice_name]
 
     speed = st.slider(
         "Speech speed",
@@ -1218,99 +721,24 @@ with st.sidebar:
         step=0.05,
     )
 
-    st.caption(
-        "For Slumber Tales English, "
-        "around 0.90–1.00 is a good starting point."
-    )
-
     st.divider()
 
     st.subheader("🎧 Voice Preview")
-
-    if st.button(
-        "▶️ Preview Voice",
-        use_container_width=True,
-    ):
-
-        with st.spinner(
-            "Generating MP3 preview..."
-        ):
-
+    if st.button("▶️ Preview Default Voice", use_container_width=True):
+        with st.spinner("Generating preview..."):
             try:
-
-                kokoro = (
-                    get_kokoro_engine()
-                )
-
-                preview_mp3 = (
-                    generate_preview_mp3(
-                        kokoro,
-                        voice_key,
-                        speed,
-                    )
-                )
-
-                st.success(
-                    "Preview ready."
-                )
-
-                st.audio(
-                    preview_mp3,
-                    format="audio/mpeg",
-                )
-
+                kokoro = get_kokoro_engine()
+                preview_mp3 = generate_preview_mp3(kokoro, default_voice_key, speed)
+                st.audio(preview_mp3, format="audio/mpeg")
             except Exception as exc:
-
-                st.error(
-                    "Could not generate voice preview."
-                )
-
+                st.error("Could not generate voice preview.")
                 st.exception(exc)
 
     st.divider()
 
-    st.subheader("⚙️ Chunking")
-
-    st.write(
-        f"Target chunk size: "
-        f"**{TARGET_WORDS_PER_CHUNK} words**"
-    )
-
-    st.caption(
-        "Approximately 4–5 minutes of narration "
-        "at a calm speaking pace."
-    )
-
-    st.divider()
-
     st.subheader("🧹 Job Controls")
-
-    if st.button(
-        "Start Fresh",
-        use_container_width=True,
-    ):
-
-        current_job = (
-            st.session_state.current_job
-        )
-
-        if current_job:
-
-            work_dir = current_job.get(
-                "work_dir"
-            )
-
-            if work_dir:
-
-                try:
-                    shutil.rmtree(
-                        work_dir
-                    )
-                except Exception:
-                    pass
-
+    if st.button("Start Fresh", use_container_width=True):
         st.session_state.current_job = None
-
         st.rerun()
 
 
@@ -1318,98 +746,40 @@ with st.sidebar:
 # MAIN SCRIPT AREA
 # ============================================================
 
-st.header("📜 Narration Script")
+st.header("📜 Dialogue Script Area")
 
 script = st.text_area(
-    "Paste your story here",
+    "Paste your conversation script here",
     height=420,
     placeholder=(
-        "Paste your bedtime story here...\n\n"
-        "For example:\n"
-        "Welcome to Slumber Tales English. "
-        "Tonight, we are going to visit a little "
-        "cottage at the edge of a quiet forest..."
+        "Format your script with speaker tags like:\n\n"
+        "af_heart: Hey, did you test the multi-person local synthesis setup?\n"
+        "am_adam: Yes! It merges turns seamlessly without online rate limits."
     ),
     label_visibility="collapsed",
 )
 
-normalized_script = normalize_script(
-    script
-)
-
-word_count = (
-    len(normalized_script.split())
-    if normalized_script
-    else 0
-)
-
-character_count = len(
-    normalized_script
-)
-
-estimated_minutes = (
-    word_count / 120
-    if word_count
-    else 0
-)
-
-chunks_preview = (
-    split_script_into_chunks(
-        normalized_script
-    )
-    if normalized_script
-    else []
-)
-
-chunk_count = len(
-    chunks_preview
-)
+# Parse script turns
+parsed_turns = parse_dialogue_script(script, default_voice_key) if script else []
+total_turns = len(parsed_turns)
+total_words = sum(len(turn["text"].split()) for turn in parsed_turns)
+estimated_minutes = total_words / 120 if total_words else 0
 
 
 # ============================================================
 # SCRIPT STATISTICS
 # ============================================================
 
-col1, col2, col3, col4 = (
-    st.columns(4)
-)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-
-    st.metric(
-        "Words",
-        f"{word_count:,}",
-    )
-
+    st.metric("Total Words", f"{total_words:,}")
 with col2:
-
-    st.metric(
-        "Characters",
-        f"{character_count:,}",
-    )
-
+    st.metric("Dialogue Turns", f"{total_turns:,}")
 with col3:
-
-    st.metric(
-        "Estimated duration",
-        f"{estimated_minutes:.1f} min",
-    )
-
+    st.metric("Estimated Duration", f"{estimated_minutes:.1f} min")
 with col4:
-
-    st.metric(
-        "Audio chunks",
-        f"{chunk_count}",
-    )
-
-
-if chunk_count > 0:
-
-    st.caption(
-        f"Your script will be processed "
-        f"as approximately {chunk_count} "
-        f"independent chunks."
-    )
+    st.metric("Speakers Mode", "Dual-Voice")
 
 
 # ============================================================
@@ -1417,12 +787,10 @@ if chunk_count > 0:
 # ============================================================
 
 generate_button = st.button(
-    "🎙️ Generate Narration",
+    "🎙️ Generate Conversation Audio",
     type="primary",
     use_container_width=True,
-    disabled=not bool(
-        normalized_script
-    ),
+    disabled=not bool(parsed_turns),
 )
 
 
@@ -1431,303 +799,123 @@ generate_button = st.button(
 # ============================================================
 
 if generate_button:
-
-    if word_count < 5:
-
-        st.error(
-            "Please enter a longer script."
-        )
-
+    if total_words < 3:
+        st.error("Please enter a longer script.")
         st.stop()
 
-    # --------------------------------------------------------
-    # JOB ID
-    # --------------------------------------------------------
+    job_id = make_job_id(script, default_voice_key, speed)
+    job_dir = create_job_directory(job_id)
 
-    job_id = make_job_id(
-        normalized_script,
-        voice_key,
-        speed,
-    )
+    final_wav_path = job_dir / "final_narration.wav"
+    final_mp3_path = job_dir / "final_narration.mp3"
 
-    job_dir = (
-        create_job_directory(
-            job_id
-        )
-    )
-
-    final_wav_path = (
-        job_dir
-        / "final_narration.wav"
-    )
-
-    final_mp3_path = (
-        job_dir
-        / "final_narration.mp3"
-    )
-
-    # --------------------------------------------------------
-    # CHECK IF FINAL MP3 ALREADY EXISTS
-    # --------------------------------------------------------
-
-    if (
-        final_mp3_path.exists()
-        and final_mp3_path.stat().st_size > 0
-    ):
-
+    if final_mp3_path.exists() and final_mp3_path.stat().st_size > 0:
         st.session_state.current_job = {
             "job_id": job_id,
             "work_dir": str(job_dir),
-            "voice": voice_key,
-            "voice_name": voice_name,
-            "speed": speed,
-            "word_count": word_count,
-            "total_chunks": chunk_count,
-            "completed_chunks": chunk_count,
-            "mp3_path": str(
-                final_mp3_path
-            ),
+            "mp3_path": str(final_mp3_path),
         }
-
-        st.success(
-            "This narration already exists. "
-            "Using the completed MP3."
-        )
-
+        st.success("Conversation audio already exists. Loading cached output.")
         st.rerun()
-
-    # --------------------------------------------------------
-    # CURRENT JOB METADATA
-    # --------------------------------------------------------
 
     st.session_state.current_job = {
         "job_id": job_id,
         "work_dir": str(job_dir),
-        "voice": voice_key,
-        "voice_name": voice_name,
-        "speed": speed,
-        "word_count": word_count,
-        "total_chunks": chunk_count,
-        "completed_chunks": 0,
         "mp3_path": None,
     }
 
-    # --------------------------------------------------------
-    # LOAD KOKORO
-    # --------------------------------------------------------
-
     try:
-
-        kokoro = (
-            get_kokoro_engine()
-        )
-
+        kokoro = get_kokoro_engine()
     except Exception as exc:
-
-        st.error(
-            "Could not load the Kokoro model."
-        )
-
+        st.error("Could not load the Kokoro model.")
         st.exception(exc)
-
         st.stop()
 
-    # --------------------------------------------------------
-    # PROGRESS UI
-    # --------------------------------------------------------
-
-    progress = st.progress(
-        0,
-        text="Preparing narration...",
-    )
-
+    progress = st.progress(0, text="Initializing multi-speaker synthesis...")
     status_box = st.empty()
 
-    # --------------------------------------------------------
-    # GENERATE CHUNKS
-    # --------------------------------------------------------
-
     try:
+        chunk_paths = []
+        pause_duration = 0.35  # Natural pause between speakers in seconds
 
-        for index, chunk_text in enumerate(
-            chunks_preview,
-            start=1,
-        ):
+        for index, turn in enumerate(parsed_turns, start=1):
+            chunk_path = get_chunk_path(job_dir, index)
+            chunk_paths.append(chunk_path)
 
-            chunk_path = (
-                get_chunk_path(
-                    job_dir,
-                    index,
-                )
-            )
-
-            # --------------------------------------------
-            # RECOVERY
-            # --------------------------------------------
-
-            if chunk_is_complete(
-                chunk_path
-            ):
-
-                status_box.markdown(
-                    f"""
-                    <div class="status-box">
-                    ♻️ Chunk <b>{index}</b> /
-                    <b>{chunk_count}</b> already exists.
-                    Skipping regeneration.
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-                progress.progress(
-                    index / chunk_count,
-                    text=(
-                        f"Recovered chunk "
-                        f"{index}/{chunk_count}"
-                    ),
-                )
-
+            if chunk_is_complete(chunk_path):
+                progress.progress(index / total_turns, text=f"Recovered turn {index}/{total_turns}")
                 continue
 
-            # --------------------------------------------
-            # GENERATE
-            # --------------------------------------------
-
             status_box.markdown(
-                f"""
-                <div class="status-box">
-                🎙️ Generating chunk
-                <b>{index}</b> /
-                <b>{chunk_count}</b>...
-                </div>
-                """,
+                f"""<div class="status-box">
+                🎙️ Synthesizing turn <b>{index}</b> / <b>{total_turns}</b> using voice: <code>{turn['voice']}</code>
+                </div>""",
                 unsafe_allow_html=True,
             )
 
-            generate_chunk(
+            # Generate individual turn audio
+            sample_rate = generate_dialogue_chunk(
                 kokoro,
-                chunk_text,
-                voice_key,
+                turn["text"],
+                turn["voice"],
                 speed,
                 chunk_path,
             )
 
-            progress.progress(
-                index / chunk_count,
-                text=(
-                    f"Generated chunk "
-                    f"{index}/{chunk_count}"
-                ),
-            )
+            progress.progress(index / total_turns, text=f"Completed turn {index}/{total_turns}")
 
-        # ----------------------------------------------------
-        # COMBINE
-        # ----------------------------------------------------
-
+        # Combine all sentence/turn files sequentially with minor breath/pacing silences
         status_box.markdown(
-            """
-            <div class="status-box">
-            🔗 Combining audio chunks...
-            </div>
-            """,
+            f"""<div class="status-box">🔗 Merging dialogue audio tracks into final file...</div>""",
             unsafe_allow_html=True,
         )
 
-        chunk_paths = [
-            get_chunk_path(job_dir, i)
-            for i in range(1, chunk_count + 1)
-        ]
+        audio_segments = []
+        silence_samples = np.zeros(int(OUTPUT_SAMPLE_RATE * pause_duration), dtype=np.float32)
 
-        combine_wav_files(
-            chunk_paths,
-            final_wav_path,
-        )
+        for cp in chunk_paths:
+            data, sr = sf.read(str(cp), dtype="float32")
+            audio_segments.append(data)
+            audio_segments.append(silence_samples)
 
-        # ----------------------------------------------------
-        # MP3 CONVERSION
-        # ----------------------------------------------------
+        if audio_segments:
+            combined_audio = np.concatenate(audio_segments)
+            sf.write(str(final_wav_path), combined_audio, OUTPUT_SAMPLE_RATE, subtype="PCM_16")
 
-        status_box.markdown(
-            """
-            <div class="status-box">
-            🎵 Converting final audio to MP3...
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        # Convert to MP3
+        convert_wav_to_mp3(final_wav_path, final_mp3_path)
 
-        convert_wav_to_mp3(
-            final_wav_path,
-            final_mp3_path,
-        )
-
-        # ----------------------------------------------------
-        # CLEANUP WAVS
-        # ----------------------------------------------------
-
-        delete_all_wav_files(job_dir)
-
-        st.session_state.current_job = {
-            "job_id": job_id,
-            "work_dir": str(job_dir),
-            "voice": voice_key,
-            "voice_name": voice_name,
-            "speed": speed,
-            "word_count": word_count,
-            "total_chunks": chunk_count,
-            "completed_chunks": chunk_count,
-            "mp3_path": str(final_mp3_path),
-        }
-
-        add_history_item(st.session_state.current_job)
-        cleanup_history_dirs()
-
+        st.session_state.current_job["mp3_path"] = str(final_mp3_path)
         status_box.empty()
         progress.empty()
-
-        st.success("Narration generation complete!")
+        st.success("✨ Multi-person conversation generated successfully!")
         st.rerun()
 
     except Exception as exc:
-        status_box.empty()
-        progress.empty()
-        st.error("An error occurred during audio generation.")
+        st.error("An error occurred during multi-speaker audio generation.")
         st.exception(exc)
 
 
 # ============================================================
-# PLAYER & DOWNLOAD SECTION
+# RENDER COMPLETED JOB OUTPUT
 # ============================================================
 
 current_job = st.session_state.current_job
-
 if current_job and current_job.get("mp3_path"):
-    mp3_path_str = current_job.get("mp3_path")
-
-    if mp3_path_str and Path(mp3_path_str).exists():
+    mp3_file = Path(current_job["mp3_path"])
+    if mp3_file.exists():
         st.divider()
-        st.header("🎧 Final Narration")
-
-        with open(mp3_path_str, "rb") as f:
+        st.subheader("🎧 Generated Conversation Output")
+        
+        with open(mp3_file, "rb") as f:
             mp3_bytes = f.read()
 
         st.audio(mp3_bytes, format="audio/mpeg")
-
-        col_dl, col_info = st.columns([1, 2])
-
-        with col_dl:
-            st.download_button(
-                label="📥 Download MP3",
-                data=mp3_bytes,
-                file_name="lenchos_narration.mp3",
-                mime="audio/mpeg",
-                use_container_width=True,
-            )
-
-        with col_info:
-            st.info(
-                f"Narrator: **{current_job.get('voice_name')}** | "
-                f"Words: **{current_job.get('word_count'):,}** | "
-                f"Speed: **{current_job.get('speed')}x**"
-            )
+        
+        st.download_button(
+            label="📥 Download Conversation MP3",
+            data=mp3_bytes,
+            file_name="lenchos_studio_conversation.mp3",
+            mime="audio/mpeg",
+            use_container_width=True,
+        )
