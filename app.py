@@ -325,7 +325,6 @@ def parse_dialogue_script(text, default_voice, secondary_voice):
             speaker_label = match.group(1).strip().lower()
             utterance = match.group(2).strip()
             
-            # Mappings for A, B, Speaker 1, Speaker 2, or direct IDs
             if speaker_label in ["a", "speaker a", "speaker 1", "s1", "voice 1", default_voice.lower()]:
                 assigned_voice = default_voice
             elif speaker_label in ["b", "speaker b", "speaker 2", "s2", "voice 2", secondary_voice.lower()]:
@@ -422,7 +421,7 @@ def generate_preview_mp3(kokoro, voice, speed=1.0):
 tab_single, tab_dual = st.tabs(["🎙️ Single Narration", "👥 2-Person Conversation"])
 
 # ------------------------------------------------------------
-# TAB 1: SINGLE NARRATION (WITH CHUNKING METHOD)
+# TAB 1: SINGLE NARRATION
 # ------------------------------------------------------------
 with tab_single:
     st.header("📜 Single Narration Studio")
@@ -458,7 +457,6 @@ with tab_single:
     norm_single = normalize_script(single_script_input)
     single_chunks = split_script_into_chunks(norm_single, TARGET_WORDS_PER_CHUNK) if norm_single else []
     
-    # Calculate exact metrics based on actual chunked text tokens
     single_words = sum(len(chunk.split()) for chunk in single_chunks)
     estimated_minutes = (single_words / 130.0) / float(single_speed) if single_words else 0.0
 
@@ -481,7 +479,7 @@ with tab_single:
         final_mp3 = job_dir / "final_narration.mp3"
 
         if final_mp3.exists() and final_mp3.stat().st_size > 0:
-            st.success("Narration already exists. Loading output.")
+            st.success("Narration already exists in disk cache. Loading output instantly!")
             st.audio(str(final_mp3), format="audio/mpeg")
             st.stop()
 
@@ -511,12 +509,12 @@ with tab_single:
         if audio_data:
             sf.write(str(final_wav), np.concatenate(audio_data), OUTPUT_SAMPLE_RATE, subtype="PCM_16")
             convert_wav_to_mp3(final_wav, final_mp3)
-            st.success("Narration generated successfully!")
+            st.success("Narration generated successfully and cached to disk!")
             st.audio(str(final_mp3), format="audio/mpeg")
 
 
 # ------------------------------------------------------------
-# TAB 2: 2-PERSON CONVERSATION
+# TAB 2: 2-PERSON CONVERSATION (DISK CACHE ENHANCED)
 # ------------------------------------------------------------
 with tab_dual:
     st.header("👥 2-Person Conversation Studio")
@@ -572,6 +570,12 @@ with tab_dual:
         final_wav = job_dir / "final_conversation.wav"
         final_mp3 = job_dir / "final_conversation.mp3"
 
+        # 🔥 DISK CACHE CHECK: If this exact script was already generated, load instantly!
+        if final_mp3.exists() and final_mp3.stat().st_size > 0:
+            st.success("Conversation already exists in disk cache. Loading output instantly!")
+            st.audio(str(final_mp3), format="audio/mpeg")
+            st.stop()
+
         try:
             kokoro = get_kokoro_engine()
         except Exception as exc:
@@ -586,6 +590,7 @@ with tab_dual:
         for idx, turn in enumerate(parsed_turns, start=1):
             t_path = get_chunk_path(job_dir, idx)
             turn_paths.append(t_path)
+            # If a single turn's cache is already on disk, skip re-rendering it!
             if not chunk_is_complete(t_path):
                 samples, sr = kokoro.create(turn["text"], voice=turn["voice"], speed=1.0, lang="en-us")
                 sf.write(str(t_path), np.asarray(samples, dtype=np.float32), int(sr), subtype="PCM_16")
@@ -600,5 +605,5 @@ with tab_dual:
         if audio_segments:
             sf.write(str(final_wav), np.concatenate(audio_segments), OUTPUT_SAMPLE_RATE, subtype="PCM_16")
             convert_wav_to_mp3(final_wav, final_mp3)
-            st.success("Conversation generated successfully!")
+            st.success("Conversation generated successfully and cached to disk!")
             st.audio(str(final_mp3), format="audio/mpeg")
