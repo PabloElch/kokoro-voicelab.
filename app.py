@@ -328,16 +328,30 @@ st.markdown(
 
 st.markdown(
     """
+    <style>
+    @keyframes softGlow {
+        0% { text-shadow: 0 0 4px rgba(79, 70, 229, 0.3), 0 0 10px rgba(79, 70, 229, 0.1); }
+        50% { text-shadow: 0 0 12px rgba(79, 70, 229, 0.6), 0 0 20px rgba(79, 70, 229, 0.3); }
+        100% { text-shadow: 0 0 4px rgba(79, 70, 229, 0.3), 0 0 10px rgba(79, 70, 229, 0.1); }
+    }
+    
+    .glowing-name {
+        color: #4f46e5;
+        font-weight: 700;
+        animation: softGlow 3s infinite ease-in-out;
+    }
+    </style>
+
     <div class="hero-container">
-        <div class="hero-title">
+        <div class="hero-title" style="font-weight: 800; font-size: 28px; margin-bottom: 8px;">
             🎙️ LENCHOS AUDIO STUDIO
         </div>
-        <div class="hero-subtitle">
-            Built by Lencho Lemessa to deliver soothing, long-form voice synthesis.
+        <div class="hero-subtitle" style="font-size: 16px; color: #64748b;">
+            Built by <span class="glowing-name">Lencho Lemessa</span> to deliver soothing, long-form voice synthesis.
         </div>
     </div>
     """,
-    unsafe_allow_html=True,
+    unsafe_allow_auth=True, # Note: Streamlit expects unsafe_allow_html=True
 )
 
 
