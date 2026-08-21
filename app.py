@@ -218,17 +218,6 @@ st.markdown(
 
 
 # ============================================================
-# SESSION STATE
-# ============================================================
-
-if "current_job" not in st.session_state:
-    st.session_state.current_job = None
-
-if "history" not in st.session_state:
-    st.session_state.history = []
-
-
-# ============================================================
 # DIRECTORY HELPERS
 # ============================================================
 
@@ -266,7 +255,7 @@ def get_kokoro_engine():
 
 
 # ============================================================
-# TEXT PROCESSING & UTILS
+# TEXT PROCESSING & CHUNKING UTILS
 # ============================================================
 
 def normalize_script(text):
@@ -430,7 +419,7 @@ def generate_preview_mp3(kokoro, voice, speed=1.0):
 tab_single, tab_dual = st.tabs(["🎙️ Single Narration", "👥 2-Person Conversation"])
 
 # ------------------------------------------------------------
-# TAB 1: SINGLE NARRATION
+# TAB 1: SINGLE NARRATION (WITH CHUNKING METHOD)
 # ------------------------------------------------------------
 with tab_single:
     st.header("📜 Single Narration Studio")
@@ -459,7 +448,7 @@ with tab_single:
     single_script_input = st.text_area(
         "Paste your story script here",
         height=380,
-        placeholder="Type or paste your single narration story here...",
+        placeholder="Type or paste your long story script here...",
         key="single_script_text"
     )
 
