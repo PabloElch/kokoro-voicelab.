@@ -37,7 +37,23 @@ VOICES_URL = (
 MODEL_FILENAME = "kokoro-v1.0.onnx"
 VOICES_FILENAME = "voices-v1.0.bin"
 
-AVAILABLE_VOICES = [
+# Friendly Voice Map for Single Narration
+SINGLE_VOICE_MAP = {
+    "🇺🇸 Beza (Warm Female)": "af_heart",
+    "🇺🇸 Birikti (Soft Female)": "af_bella",
+    "🇺🇸 Demoze (Clear Female)": "af_nicole",
+    "🇺🇸 Lalise (News Female)": "af_sarah",
+    "🇺🇸 Efrata (Casual Female)": "af_sky",
+    "🇺🇸 Lencho (Deep Male)": "am_adam",
+    "🇺🇸 Dego (Crisp Male)": "am_michael",
+    "🇬🇧 Bontu (Professional Female)": "bf_emma",
+    "🇬🇧 Hawi (Warm Female)": "bf_isabella",
+    "🇬🇧 Lalisa (Expressive Male)": "bm_george",
+    "🇬🇧 Lemi (Narration Male)": "bm_fable",
+}
+
+# Raw Real Voice IDs for 2-Person Conversation
+RAW_VOICES = [
     "af_heart",
     "af_bella",
     "af_nicole",
@@ -65,7 +81,7 @@ st.set_page_config(
 
 
 # ============================================================
-# CSS
+# CSS & DROPDOWN FIXES
 # ============================================================
 
 st.markdown(
@@ -100,14 +116,8 @@ st.markdown(
         padding: 28px 10px 20px 10px;
         text-align: center;
     }
-    .status-box {
-        padding: 14px;
-        border-radius: 12px;
-        border: 1px solid #29292d;
-        background-color: #111114;
-        margin-top: 10px;
-        color: #f2f2f2;
-    }
+    
+    /* Textareas and Inputs */
     textarea {
         background-color: #111114 !important;
         color: #f5f5f5 !important;
@@ -117,11 +127,34 @@ st.markdown(
         background-color: #111114 !important;
         color: #f5f5f5 !important;
     }
+
+    /* Fix Selectbox Dropdown Options Readability */
     [data-baseweb="select"] > div {
         background-color: #111114 !important;
         color: #f5f5f5 !important;
         border-color: #303036 !important;
     }
+    [data-baseweb="select"] span {
+        color: #f5f5f5 !important;
+    }
+    [data-baseweb="popover"], [data-baseweb="menu"], ul[role="listbox"] {
+        background-color: #111114 !important;
+        color: #f5f5f5 !important;
+        border: 1px solid #303036 !important;
+    }
+    [role="option"] {
+        background-color: #111114 !important;
+        color: #f5f5f5 !important;
+    }
+    [role="option"]:hover {
+        background-color: #222226 !important;
+        color: #ffffff !important;
+    }
+    [aria-selected="true"] {
+        background-color: #2a2a30 !important;
+        color: #ffffff !important;
+    }
+
     [data-testid="stMetric"] {
         background-color: #111114;
         border: 1px solid #29292d;
@@ -404,11 +437,17 @@ with tab_single:
 
     with st.sidebar:
         st.header("🎙️ Voice Settings")
-        single_voice = st.selectbox("Narrator Voice", AVAILABLE_VOICES, index=0, key="single_voice_select")
+        selected_friendly_name = st.selectbox(
+            "Narrator Voice",
+            list(SINGLE_VOICE_MAP.keys()),
+            index=0,
+            key="single_voice_select"
+        )
+        single_voice = SINGLE_VOICE_MAP[selected_friendly_name]
         single_speed = st.slider("Speech speed", min_value=0.5, max_value=2.0, value=1.0, step=0.05, key="single_speed")
 
         if st.button("▶️ Preview Voice", use_container_width=True, key="preview_single_btn"):
-            with st.spinner(f"Generating preview for {single_voice}..."):
+            with st.spinner(f"Generating preview for {selected_friendly_name}..."):
                 try:
                     kokoro = get_kokoro_engine()
                     preview_mp3 = generate_preview_mp3(kokoro, single_voice, single_speed)
@@ -469,7 +508,6 @@ with tab_single:
                 sf.write(str(c_path), np.asarray(samples, dtype=np.float32), int(sr), subtype="PCM_16")
             progress.progress(idx / len(single_chunks), text=f"Processed chunk {idx}/{len(single_chunks)}")
 
-        # Merge segments
         audio_data = []
         for cp in chunk_paths:
             data, _ = sf.read(str(cp), dtype="float32")
@@ -490,7 +528,7 @@ with tab_dual:
 
     col_v1, col_v2 = st.columns(2)
     with col_v1:
-        voice_1 = st.selectbox("Voice 1 Persona", AVAILABLE_VOICES, index=0, key="voice_1_select")
+        voice_1 = st.selectbox("Voice 1 Persona (Raw ID)", RAW_VOICES, index=0, key="voice_1_select")
         if st.button("▶️ Preview Voice 1", use_container_width=True, key="preview_v1_btn"):
             with st.spinner(f"Generating preview for {voice_1}..."):
                 try:
@@ -502,7 +540,7 @@ with tab_dual:
                     st.exception(exc)
 
     with col_v2:
-        voice_2 = st.selectbox("Voice 2 Persona", AVAILABLE_VOICES, index=5, key="voice_2_select")
+        voice_2 = st.selectbox("Voice 2 Persona (Raw ID)", RAW_VOICES, index=5, key="voice_2_select")
         if st.button("▶️ Preview Voice 2", use_container_width=True, key="preview_v2_btn"):
             with st.spinner(f"Generating preview for {voice_2}..."):
                 try:
@@ -558,7 +596,6 @@ with tab_dual:
                 sf.write(str(t_path), np.asarray(samples, dtype=np.float32), int(sr), subtype="PCM_16")
             progress.progress(idx / len(parsed_turns), text=f"Processed turn {idx}/{len(parsed_turns)}")
 
-        # Assemble conversation audio with brief breath pauses
         audio_segments = []
         for tp in turn_paths:
             data, _ = sf.read(str(tp), dtype="float32")
