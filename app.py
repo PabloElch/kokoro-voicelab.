@@ -20,7 +20,7 @@ from kokoro_onnx import Kokoro
 
 APP_NAME = "Lenchos Audio Studio"
 
-TARGET_WORDS_PER_CHUNK = 550
+TARGET_WORDS_PER_CHUNK = 500
 
 OUTPUT_SAMPLE_RATE = 24000
 
@@ -453,14 +453,17 @@ with tab_single:
     )
 
     norm_single = normalize_script(single_script_input)
-    single_words = len(norm_single.split()) if norm_single else 0
-    single_chunks = split_script_into_chunks(norm_single) if norm_single else []
+    single_chunks = split_script_into_chunks(norm_single, TARGET_WORDS_PER_CHUNK) if norm_single else []
+    
+    # Calculate exact metrics based on actual chunked text tokens
+    single_words = sum(len(chunk.split()) for chunk in single_chunks)
+    estimated_minutes = (single_words / 130.0) / float(single_speed) if single_words else 0.0
 
     col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Words", f"{single_words:,}")
     with col2:
-        st.metric("Estimated Minutes", f"{single_words / 120:.1f} min" if single_words else "0 min")
+        st.metric("Estimated Minutes", f"{estimated_minutes:.1f} min" if single_words else "0 min")
     with col3:
         st.metric("Chunks", f"{len(single_chunks)}")
 
