@@ -322,14 +322,17 @@ def parse_dialogue_script(text, default_voice, secondary_voice):
             continue
         match = re.match(r"^([\w\-_]+?)\s*:\s*(.+)$", line_str)
         if match:
-            speaker_label = match.group(1).strip()
+            speaker_label = match.group(1).strip().lower()
             utterance = match.group(2).strip()
-            if speaker_label.lower() in ["speaker 1", "s1", default_voice.lower()]:
+            
+            # Mappings for A, B, Speaker 1, Speaker 2, or direct IDs
+            if speaker_label in ["a", "speaker a", "speaker 1", "s1", "voice 1", default_voice.lower()]:
                 assigned_voice = default_voice
-            elif speaker_label.lower() in ["speaker 2", "s2", secondary_voice.lower()]:
+            elif speaker_label in ["b", "speaker b", "speaker 2", "s2", "voice 2", secondary_voice.lower()]:
                 assigned_voice = secondary_voice
             else:
                 assigned_voice = default_voice
+                
             if utterance:
                 parsed_turns.append({"voice": assigned_voice, "text": utterance})
         else:
@@ -546,7 +549,7 @@ with tab_dual:
     dual_script_input = st.text_area(
         "Paste dialogue script",
         height=320,
-        placeholder=f"{voice_1}: Hey, did you test the local synthesis setup?\n{voice_2}: Yes, it works seamlessly!",
+        placeholder="A: Hey, did you test the local synthesis setup?\nB: Yes, it works seamlessly!",
         key="dual_script_text"
     )
 
