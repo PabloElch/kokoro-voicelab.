@@ -333,7 +333,7 @@ st.markdown(
             🎙️ LENCHOS AUDIO STUDIO
         </div>
         <div class="hero-subtitle">
-            Open-source AI narration for calm, long-form audio.
+            Built by Lencho Lemessa to deliver soothing, long-form voice synthesis.
         </div>
     </div>
     """,
